@@ -20,7 +20,7 @@
   --shadow:0 1px 2px rgba(24,33,43,.03),0 10px 30px rgba(24,33,43,.035);
 }
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{margin:0;min-width:320px;background:var(--bg)}
 button{font:inherit}
 button:focus-visible{outline:3px solid rgba(47,125,115,.24);outline-offset:2px}
@@ -319,3 +319,20 @@ body{overflow-x:clip}
 .transaction-list{overflow:hidden}
 .transaction-row{overflow:hidden}
 .transaction-row>div:nth-child(2){overflow:hidden}
+
+/* Keep ledger rows stable when iOS uses larger accessibility text. */
+.transaction-row{
+  display:grid;
+  grid-template-columns:31px minmax(0,1fr) max-content;
+  align-items:center;
+}
+.transaction-row>div:nth-child(2){width:100%;min-width:0}
+.transaction-row strong,.transaction-row span{max-width:100%}
+.transaction-row>b{min-width:0;justify-self:end;text-align:right}
+
+@media (max-width:767px){
+  .transaction-row{grid-template-columns:31px minmax(0,1fr) max-content;column-gap:9px}
+  .transaction-row strong{font-size:12px;line-height:1.35}
+  .transaction-row span{font-size:10px;line-height:1.35}
+  .transaction-row>b{font-size:11px;line-height:1.35}
+}
