@@ -30,11 +30,11 @@ function App() {
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
 
-  const months = data.ledger?.monthly?.length ? data.ledger.monthly : fallback.ledger.monthly;
-  const transactions = data.ledger?.transactions?.length ? data.ledger.transactions : fallback.ledger.transactions;
-  const weights = data.growth?.weights?.length ? data.growth.weights : fallback.growth.weights;
-  const vaccines = data.vaccines?.length ? data.vaccines : fallback.vaccines;
-  const pantry = data.pantry?.items?.length ? data.pantry : fallback.pantry;
+  const isDemo = data.meta?.mode === 'demo';\n  const months = data.ledger?.monthly?.length ? data.ledger.monthly : (isDemo ? fallback.ledger.monthly : []);
+  const transactions = data.ledger?.transactions?.length ? data.ledger.transactions : (isDemo ? fallback.ledger.transactions : []);
+  const weights = data.growth?.weights?.length ? data.growth.weights : (isDemo ? fallback.growth.weights : []);
+  const vaccines = data.vaccines?.length ? data.vaccines : (isDemo ? fallback.vaccines : []);
+  const pantry = data.pantry?.items?.length ? data.pantry : (isDemo ? fallback.pantry : {total:0,low:0,nearExpiry:0,items:[]});
   const latestWeight = Number(weights[0]?.weight || weights.at(-1)?.weight || 0);
   const currentMonth = months.at(-1) || {};
   const online = data.meta?.sources?.filter((source) => source.ok).length || 0;
