@@ -1,10 +1,104 @@
-const LOG_BASE=process.env.YUDAN_LOG_BASE_URL||'https://cost.ykn.cm';
-const PANTRY_BASE=process.env.YUDAN_PANTRY_BASE_URL||'https://wupin.ykn.cm';
-async function read(base,path,key){try{const response=await fetch(`${base}${path}`,{headers:{Accept:'application/json',...(key?{Authorization:`Bearer ${key}`}:{})},signal:AbortSignal.timeout(8000)});if(!response.ok)return{ok:false,data:null};const json=await response.json();return{ok:true,data:json?.data??json}}catch{return{ok:false,data:null}}}
-function arrayOf(value,keys=[]){if(Array.isArray(value))return value;for(const key of keys)if(Array.isArray(value?.[key]))return value[key];return[]}
-const monthlyOf=(value)=>arrayOf(value,['months','monthly','items']).map((x)=>({month:x.month_label||x.month||x.label||String(x.date||'').slice(5,7)+'月',income:Number(x.income||x.total_income||0),expense:Number(x.expense||x.total_expense||x.amount||0)}));
-const transactionsOf=(value)=>arrayOf(value,['items','transactions','records']).map((x)=>({date:x.date||x.transaction_date||x.created_at,title:x.title||x.description||x.note||'家庭支出',category:x.category||x.category_name||'未分类',amount:Number(x.amount||0)}));
-const weightsOf=(value)=>arrayOf(value?.weights||value,['weights','records']).map((x)=>({date:x.date||x.measured_date,weight:Number(x.weight||x.weight_kg||0)})).filter((x)=>x.weight).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-const vaccinesOf=(value)=>arrayOf(value,['vaccines','schedule','items']).filter((x)=>!x.actual_date).map((x)=>({name:[x.vaccine_name||x.vaccine||x.name,x.dose?`第 ${x.dose} 剂`:''].filter(Boolean).join(' · '),date:x.suggested_date||x.date,status:x.status||'计划中'}));
-function pantryOf(value,products,attention){const source=arrayOf(value,['attention','restock','items','products']);const all=arrayOf(products,['products','items']);const alerts=arrayOf(attention,['batches','items']);const items=(source.length?source:all).map((x)=>({name:x.name||x.product_name||x.product?.name,stock:Number(x.stock??x.current_stock??x.quantity??x.total_quantity??0),unit:x.unit||x.product?.unit||'',status:x.status_text||x.alert||x.status||(Number(x.stock??x.current_stock??0)<=Number(x.min_stock??0)?'库存偏低':'正常')})).filter((x)=>x.name);const stats=value?.stats||value?.summary||value||{};return{total:Number(stats.total_products??stats.active_products??all.length??items.length),low:Number(stats.low_stock??stats.low_stock_count??stats.out_of_stock??0),nearExpiry:Number(stats.near_expiry??stats.near_expiry_count??alerts.length??0),items}}
-export default async function handler(request,response){if(request.method!=='GET')return response.status(405).json({message:'Method Not Allowed'});const logKey=process.env.YUDAN_LOG_API_KEY;const pantryKey=process.env.YUDAN_PANTRY_API_KEY;const [monthly,list,growth,vaccines,dashboard,products,attention]=await Promise.all([read(LOG_BASE,'/api/monthly'),read(LOG_BASE,'/api/list?limit=8'),read(LOG_BASE,'/api/yudan',logKey),read(LOG_BASE,'/api/yudan/vaccines',logKey),read(PANTRY_BASE,'/api/dashboard'),read(PANTRY_BASE,'/api/products?active=1'),read(PANTRY_BASE,'/api/batches?filter=attention',pantryKey)]);const sources=[{name:'鱼蛋小账本',ok:monthly.ok||list.ok},{name:'鱼蛋成长看板',ok:growth.ok||vaccines.ok,requiresKey:!logKey},{name:'鱼蛋宝贝消耗品',ok:dashboard.ok||products.ok,requiresKey:!pantryKey}];response.setHeader('Cache-Control','s-maxage=120, stale-while-revalidate=600');return response.status(200).json({meta:{mode:sources.every((x)=>x.ok)?'live':'partial',updatedAt:new Date().toISOString(),sources},ledger:{monthly:monthlyOf(monthly.data),transactions:transactionsOf(list.data)},growth:{weights:weightsOf(growth.data)},vaccines:vaccinesOf(vaccines.data),pantry:pantryOf(dashboard.data,products.data,attention.data)})}
+const LOG_BASE = process.env.YUDAN_LOG_BASE_URL || 'https://cost.ykn.cm';
+const PANTRY_BASE = process.env.YUDAN_PANTRY_BASE_URL || 'https://wupin.ykn.cm';
+
+async function read(base, path, key) {
+  try {
+    const response = await fetch(`${base}${path}`, {
+      headers: { Accept: 'application/json', ...(key ? { Authorization: `Bearer ${key}` } : {}) },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return { ok: false, data: null };
+    const json = await response.json();
+    return { ok: true, data: json?.data ?? json };
+  } catch {
+    return { ok: false, data: null };
+  }
+}
+
+function arrayOf(value, keys = []) {
+  if (Array.isArray(value)) return value;
+  for (const key of keys) if (Array.isArray(value?.[key])) return value[key];
+  return [];
+}
+
+async function readMonthlySeries() {
+  const today = new Date();
+  const targets = Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - (5 - index), 1));
+    return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1 };
+  });
+  const results = await Promise.all(targets.map(({ year, month }) => read(LOG_BASE, `/api/monthly?year=${year}&month=${month}`)));
+  return {
+    ok: results.some((result) => result.ok),
+    data: results.map((result, index) => ({
+      month: `${targets[index].month}月`,
+      income: 0,
+      expense: Number(result.data?.totalExpense || 0),
+    })),
+  };
+}
+
+const transactionsOf = (value) => arrayOf(value, ['items', 'transactions', 'records']).map((item) => ({
+  date: item.date || item.transaction_date || item.created_at,
+  title: item.title || item.description || item.note || '家庭支出',
+  category: item.category || item.category_name || '未分类',
+  amount: Number(item.amount || 0),
+}));
+
+const weightsOf = (value) => arrayOf(value?.weights || value, ['weights', 'records']).map((item) => ({
+  date: item.date || item.measured_date,
+  weight: Number(item.weight || item.weight_kg || 0),
+})).filter((item) => item.weight).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+const vaccinesOf = (value) => arrayOf(value, ['vaccines', 'schedule', 'items']).filter((item) => !item.actual_date).map((item) => ({
+  name: [item.vaccine_name || item.vaccine || item.name, item.dose ? `第 ${item.dose} 剂` : ''].filter(Boolean).join(' · '),
+  date: item.suggested_date || item.date,
+  status: item.status || '计划中',
+}));
+
+function pantryOf(value, products, attention) {
+  const all = arrayOf(products, ['products', 'items']);
+  const alerts = arrayOf(attention, ['batches', 'items']);
+  const source = arrayOf(value, ['replenishList', 'favorites', 'searchItems', 'attention', 'restock', 'items', 'products']);
+  const items = source.map((item) => ({
+    name: item.name || item.product_name || item.product?.name,
+    stock: Number(item.stock ?? item.current_stock ?? item.quantity ?? item.total_quantity ?? 0),
+    unit: item.unit || item.product?.unit || '',
+    status: Number(item.current_stock ?? item.stock ?? 0) <= Number(item.min_stock ?? 0) ? '库存偏低' : (item.status_text || item.alert || item.status || '正常'),
+  })).filter((item) => item.name);
+  const stats = value || {};
+  return {
+    total: Number(stats.productCount ?? stats.total_products ?? stats.active_products ?? all.length ?? items.length),
+    low: Number(stats.lowStockCount ?? stats.low_stock ?? stats.low_stock_count ?? 0),
+    nearExpiry: Number(stats.nearExpiryCount ?? stats.near_expiry ?? stats.near_expiry_count ?? alerts.length ?? 0),
+    items,
+  };
+}
+
+export default async function handler(request, response) {
+  if (request.method !== 'GET') return response.status(405).json({ message: 'Method Not Allowed' });
+  const logKey = process.env.YUDAN_LOG_API_KEY;
+  const pantryKey = process.env.YUDAN_PANTRY_API_KEY;
+  const [monthly, list, growth, vaccines, dashboard, products, attention] = await Promise.all([
+    readMonthlySeries(),
+    read(LOG_BASE, '/api/list?limit=8'),
+    read(LOG_BASE, '/api/yudan', logKey),
+    read(LOG_BASE, '/api/yudan/vaccines', logKey),
+    read(PANTRY_BASE, '/api/dashboard'),
+    read(PANTRY_BASE, '/api/products?active=1'),
+    read(PANTRY_BASE, '/api/batches?filter=attention', pantryKey),
+  ]);
+  const sources = [
+    { name: '鱼蛋小账本', ok: monthly.ok || list.ok },
+    { name: '鱼蛋成长看板', ok: growth.ok || vaccines.ok, requiresKey: !logKey },
+    { name: '鱼蛋宝贝消耗品', ok: dashboard.ok || products.ok, requiresKey: !pantryKey },
+  ];
+  response.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=600');
+  return response.status(200).json({
+    meta: { mode: sources.every((source) => source.ok) ? 'live' : 'partial', updatedAt: new Date().toISOString(), sources },
+    ledger: { monthly: monthly.data, transactions: transactionsOf(list.data) },
+    growth: { weights: weightsOf(growth.data) },
+    vaccines: vaccinesOf(vaccines.data),
+    pantry: pantryOf(dashboard.data, products.data, attention.data),
+  });
+}
