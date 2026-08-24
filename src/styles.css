@@ -329,6 +329,12 @@ body{overflow-x:clip}
 .transaction-row>div:nth-child(2){width:100%;min-width:0}
 .transaction-row strong,.transaction-row span{max-width:100%}
 .transaction-row>b{min-width:0;justify-self:end;text-align:right}
+.attention-row>.item-icon,.transaction-row>.item-icon{
+  display:grid;
+  place-items:center;
+  margin-top:0;
+  align-self:center;
+}
 
 @media (max-width:767px){
   .transaction-row{grid-template-columns:31px minmax(0,1fr) max-content;column-gap:9px}
