@@ -309,3 +309,13 @@ button,input{font-family:inherit}
   .metric-label{font-size:10.5px}
   .metric-foot{font-size:9.5px}
 }
+
+
+/* Mobile overflow guards */
+html,body,#root,.shell,.workspace,.page{max-width:100%}
+body{overflow-x:clip}
+.source-strip{width:100%;max-width:100%}
+.transaction-list,.transaction-row{min-width:0;width:100%;max-width:100%}
+.transaction-list{overflow:hidden}
+.transaction-row{overflow:hidden}
+.transaction-row>div:nth-child(2){overflow:hidden}
