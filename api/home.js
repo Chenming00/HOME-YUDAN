@@ -45,13 +45,13 @@ const transactionsOf = (value) => arrayOf(value, ['items', 'transactions', 'reco
   amount: Number(item.amount || 0),
 }));
 
-const weightsOf = (value) => arrayOf(value?.weights || value, ['weights', 'records']).map((item) => ({
+const weightsOf = (value) => arrayOf(value?.weight_records || value?.weights || value, ['weight_records', 'weights', 'records']).map((item) => ({
   date: item.date || item.measured_date,
   weight: Number(item.weight || item.weight_kg || 0),
 })).filter((item) => item.weight).sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
 const vaccinesOf = (value) => arrayOf(value, ['vaccines', 'schedule', 'items']).filter((item) => !item.actual_date).map((item) => ({
-  name: [item.vaccine_name || item.vaccine || item.name, item.dose ? `第 ${item.dose} 剂` : ''].filter(Boolean).join(' · '),
+  name: [item.vaccine_name || item.vaccine || item.name, item.dose || ''].filter(Boolean).join(' · '),
   date: item.suggested_date || item.date,
   status: item.status || '计划中',
 }));
@@ -90,8 +90,8 @@ export default async function handler(request, response) {
   ]);
   const sources = [
     { name: '鱼蛋小账本', ok: monthly.ok || list.ok },
-    { name: '鱼蛋成长看板', ok: growth.ok || vaccines.ok, requiresKey: !logKey },
-    { name: '鱼蛋宝贝消耗品', ok: dashboard.ok || products.ok, requiresKey: !pantryKey },
+    { name: '鱼蛋成长看板', ok: growth.ok, requiresKey: !logKey },
+    { name: '鱼蛋宝贝消耗品', ok: dashboard.ok || products.ok, requiresKey: !pantryKey && !dashboard.ok },
   ];
   response.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=600');
   return response.status(200).json({
