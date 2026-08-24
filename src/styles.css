@@ -222,3 +222,90 @@ button:focus-visible{outline:3px solid rgba(47,125,115,.24);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){
   *{scroll-behavior:auto!important;transition:none!important;animation-duration:.01ms!important}
 }
+
+
+/* Typography system */
+:root{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
+  font-size:14px;
+  line-height:1.5;
+  text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+button,input{font-family:inherit}
+.identity strong{font-size:16px;font-weight:650;letter-spacing:-.01em}
+.identity span{font-size:11px;line-height:1.4}
+.desktop-nav button{font-size:14px;font-weight:500;line-height:1.35}
+.desktop-nav button.active{font-weight:650}
+.privacy strong{font-size:12px;font-weight:650}
+.privacy span{font-size:10px}
+.kicker{font-size:10px;line-height:1.2;letter-spacing:.16em}
+.topbar h1{font-size:28px;font-weight:680;line-height:1.2;letter-spacing:-.025em}
+.sync-state{font-size:12px}
+.refresh-button{font-size:12px;font-weight:550}
+.notice{font-size:12px;line-height:1.55}
+.source-strip>span{font-size:11px;line-height:1.2}
+.source-strip b{font-size:10px}
+.metric-label{font-size:12px;line-height:1.35}
+.metric-value{font-size:28px;font-weight:680;line-height:1.18;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.metric-value small{font-size:13px;font-weight:500}
+.metric-foot{font-size:11px;line-height:1.4}
+.delta{font-size:11px;font-weight:600;font-variant-numeric:tabular-nums}
+.section-title span{font-size:10px;line-height:1.2;letter-spacing:.12em}
+.section-title h2{font-size:17px;font-weight:650;line-height:1.35;letter-spacing:-.01em}
+.section-title button{font-size:11px;font-weight:600}
+.attention-row strong,.transaction-row strong{font-size:13px;font-weight:600;line-height:1.4}
+.attention-row span,.transaction-row span{font-size:11px;line-height:1.35}
+.attention-row>b,.transaction-row>b{font-size:12px;font-weight:650;font-variant-numeric:tabular-nums}
+.date-block strong{font-size:25px;font-weight:680;font-variant-numeric:tabular-nums}
+.date-block span{font-size:11px}
+.next-vaccine>div:last-child strong{font-size:14px;font-weight:620}
+.next-vaccine>div:last-child span{font-size:11px;line-height:1.45}
+.chart-label{font-size:10px}
+.chart-value{font-size:10px;font-weight:650;font-variant-numeric:tabular-nums}
+.expense-value{font-size:10px;font-variant-numeric:tabular-nums}
+.expense-column>span{font-size:10px}
+.detail-summary>div>span{font-size:11px}
+.detail-summary>div>strong{font-size:30px;font-weight:680;font-variant-numeric:tabular-nums}
+.detail-summary small{font-size:13px}
+.table-head,.inventory-head{font-size:10px}
+.table-row{font-size:12px}
+.table-row strong{font-size:12px;font-weight:650;font-variant-numeric:tabular-nums}
+.timeline-item span{font-size:10px}
+.timeline-item strong{font-size:12px;font-weight:600;line-height:1.5}
+.inventory-row strong{font-size:13px;font-weight:600}
+.inventory-row>b{font-size:12px;font-weight:650;font-variant-numeric:tabular-nums}
+.tag{font-size:10px;font-weight:600}
+.empty{font-size:11px;line-height:1.45}
+
+@media (max-width:767px){
+  .topbar h1{font-size:24px}
+  .kicker{font-size:9px}
+  .sync-state{font-size:11px}
+  .metric-label{font-size:11px}
+  .metric-value{font-size:22px}
+  .metric-value small{font-size:12px}
+  .metric-foot{font-size:10px}
+  .delta{font-size:10px}
+  .section-title h2{font-size:16px}
+  .section-title span{font-size:9px}
+  .section-title button{font-size:11px}
+  .attention-row strong,.transaction-row strong{font-size:12px}
+  .attention-row span,.transaction-row span{font-size:10px}
+  .attention-row>b,.transaction-row>b{font-size:11px}
+  .chart-label,.chart-value{font-size:9px}
+  .expense-value,.expense-column>span{font-size:9px}
+  .timeline-item strong{font-size:12px}
+  .timeline-item span{font-size:10px}
+  .inventory-row strong{font-size:12px}
+  .inventory-row>b{font-size:11px}
+  .mobile-nav button{font-size:10px;font-weight:500;line-height:1.2}
+  .mobile-nav button.active{font-weight:650}
+}
+
+@media (max-width:390px){
+  .metric-value{font-size:20px}
+  .metric-label{font-size:10.5px}
+  .metric-foot{font-size:9.5px}
+}
