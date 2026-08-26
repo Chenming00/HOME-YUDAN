@@ -30,7 +30,7 @@ const emptyData = {
   growth: { weights: [] },
   vaccines: [],
   care: { provider: '', birthday: '', milestones: [] },
-  pantry: { total: 0, low: 0, outOfStock: 0, nearExpiry: 0, items: [] },
+  pantry: { total: 0, low: 0, outOfStock: 0, nearExpiry: 0, expired: 0, items: [], favorites: [] },
 };
 
 const navigation = [
@@ -129,11 +129,13 @@ function App() {
 
   const nextVaccine = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
+  const favoriteCount = pantry.favorites?.length || 0;
     return (data.vaccines || []).find((item) => item.date >= today) || data.vaccines?.[0];
   }, [data.vaccines]);
 
   const nextCare = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
+  const favoriteCount = pantry.favorites?.length || 0;
     return (data.care?.milestones || []).find((item) => item.date >= today) || data.care?.milestones?.at(-1);
   }, [data.care]);
 
@@ -142,6 +144,7 @@ function App() {
     if (nextVaccine) candidates.push({ ...nextVaccine, type: 'vaccine', label: nextVaccine.name });
     if (nextCare) candidates.push({ ...nextCare, type: 'care', label: nextCare.label });
     const today = new Date().toISOString().slice(0, 10);
+  const favoriteCount = pantry.favorites?.length || 0;
     return candidates
       .filter((item) => item.date)
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))
@@ -364,6 +367,7 @@ function SectionSkeleton({ tall }) {
 function Overview({ data, weights, latestWeight, weightChange, months, currentMonth, expenseChange, nextVaccine, nextCare, nextEvent, babyDays, birthday, onNavigate }) {
   const pantry = data.pantry || emptyData.pantry;
   const today = new Date().toISOString().slice(0, 10);
+  const favoriteCount = pantry.favorites?.length || 0;
 
   return (
     <>
@@ -373,7 +377,7 @@ function Overview({ data, weights, latestWeight, weightChange, months, currentMo
         <Metric icon={Baby} tone="teal" label="最新体重" value={latestWeight ? formatWeight(latestWeight.weight) : '暂无记录'} unit={latestWeight ? 'kg' : ''} detail={latestWeight ? formatDate(latestWeight.date) : '成长数据'} delta={weightChange} deltaUnit=" kg" deltaType="weight" />
         <Metric icon={Syringe} tone="blue" label="下次疫苗" value={nextVaccine ? formatDate(nextVaccine.date, true) : '暂无计划'} detail={nextVaccine?.name || '疫苗计划'} />
         <Metric icon={CircleDollarSign} tone="red" label="本月支出" value={formatCurrency(currentMonth?.expense || 0)} detail={`${currentMonth?.transactionCount || 0} 笔家庭账目`} delta={expenseChange} currencyDelta deltaType="expense" />
-        <Metric icon={ShoppingBag} tone="amber" label="用品提醒" value={String(pantry.low || 0)} unit="项" detail={`${pantry.outOfStock || 0} 项已经缺货`} />
+        <Metric icon={ShoppingBag} tone="amber" label="用品提醒" value={String(pantry.low || 0)} unit="项" detail={`${pantry.nearExpiry || 0} 项临期 · ${pantry.expired || 0} 项过期`} />
       </section>
 
       <section className="editorial-layout">
@@ -418,8 +422,28 @@ function Overview({ data, weights, latestWeight, weightChange, months, currentMo
                     <b>{item.suggested > 0 ? `补 ${item.suggested}` : `剩 ${item.stock}`} {item.unit}</b>
                   </div>
                 ))}
+                {favoriteCount > 4 && <p className="favorite-more">还有 {favoriteCount - 4} 项常用用品，可在库存页查看</p>}
               </div>
             ) : <Empty text="当前没有需要补货的用品" />}
+          </section>
+
+          <section className="favorite-panel">
+            <SectionTitle eyebrow="常用余量" title={`日常用品 · ${favoriteCount} 项`} action="查看库存" onClick={() => onNavigate('pantry')} />
+            {favoriteCount ? (
+              <div className="attention-list">
+                {pantry.favorites.slice(0, 4).map((item) => (
+                  <div className="attention-row" key={item.name}>
+                    <span className="item-icon"><PackageCheck size={16} /></span>
+                    <div>
+                      <strong>{item.name}</strong>
+                      <span>安全线 {item.minimum ?? '--'} {item.unit}</span>
+                    </div>
+                    <b>剩 {item.stock} {item.unit}</b>
+                  </div>
+                ))}
+                {favoriteCount > 4 && <p className="favorite-more">还有 {favoriteCount - 4} 项常用用品，可在库存页查看</p>}
+              </div>
+            ) : <Empty text="暂无常用用品" />}
           </section>
         </aside>
       </section>
@@ -527,6 +551,7 @@ function GrowthView({ weights, carePlan, latestWeight, weightChange }) {
 
 function CarePlanTimeline({ items }) {
   const today = new Date().toISOString().slice(0, 10);
+  const favoriteCount = pantry.favorites?.length || 0;
   const [expanded, setExpanded] = useState(false);
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
@@ -605,7 +630,7 @@ function PantryView({ pantry }) {
         <Metric icon={PackageCheck} tone="teal" label="启用商品" value={String(pantry.total || 0)} unit="种" detail="用品总数" />
         <Metric icon={AlertCircle} tone="red" label="已缺货" value={String(pantry.outOfStock || 0)} unit="项" detail="需要优先购买" />
         <Metric icon={ShoppingBag} tone="amber" label="待补货" value={String(pantry.low || 0)} unit="项" detail="达到安全线" />
-        <Metric icon={CalendarDays} tone="blue" label="近期临期" value={String(pantry.nearExpiry || 0)} unit="项" detail="未来 30 天" />
+        <Metric icon={CalendarDays} tone="blue" label="近期临期" value={String((pantry.nearExpiry || 0) + (pantry.expired || 0))} unit="项" detail={`${pantry.nearExpiry || 0} 项临期 · ${pantry.expired || 0} 项过期`} />
       </section>
       <section className="section-card">
         <SectionTitle eyebrow="库存关注" title="补货清单" />

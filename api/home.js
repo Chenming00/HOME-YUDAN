@@ -80,8 +80,10 @@ function careOf(value) {
 function pantryOf(value, products, attention) {
   const all = arrayOf(products, ['products', 'items']);
   const alerts = arrayOf(attention, ['batches', 'items']);
-  const source = arrayOf(value, ['replenishList', 'favorites', 'searchItems', 'attention', 'restock', 'items', 'products']);
-  const items = source.map((item) => {
+  const replenishment = arrayOf(value?.replenishList);
+  const favorites = arrayOf(value?.favorites);
+  const source = replenishment.length ? replenishment : arrayOf(value, ['searchItems', 'attention', 'restock', 'items', 'products']);
+  const toItem = (item) => {
     const stock = Number(item.stock ?? item.current_stock ?? item.quantity ?? item.total_quantity ?? 0);
     const minimum = Number(item.min_stock ?? item.minimum_stock ?? item.safety_stock ?? 0);
     return {
@@ -92,14 +94,17 @@ function pantryOf(value, products, attention) {
       unit: item.unit || item.product?.unit || '',
       status: stock <= 0 ? '已缺货' : stock <= minimum ? '库存偏低' : (item.status_text || item.alert || item.status || '正常'),
     };
-  }).filter((item) => item.name);
+  };
+  const items = source.map(toItem).filter((item) => item.name);
   const stats = value || {};
   return {
     total: Number(stats.productCount ?? stats.total_products ?? stats.active_products ?? all.length ?? items.length),
     low: Number(stats.lowStockCount ?? stats.low_stock ?? stats.low_stock_count ?? 0),
     outOfStock: Number(stats.outOfStockCount ?? stats.out_of_stock ?? stats.out_of_stock_count ?? 0),
     nearExpiry: Number(stats.nearExpiryCount ?? stats.near_expiry ?? stats.near_expiry_count ?? alerts.length ?? 0),
+    expired: Number(stats.expiredCount ?? stats.expired_count ?? 0),
     items,
+    favorites: favorites.map(toItem).filter((item) => item.name),
   };
 }
 
