@@ -50,11 +50,17 @@ const weightsOf = (value) => arrayOf(value?.weight_records || value?.weights || 
   weight: Number(item.weight || item.weight_kg || 0),
 })).filter((item) => item.weight).sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
-const vaccinesOf = (value) => arrayOf(value, ['vaccines', 'schedule', 'items']).filter((item) => !item.actual_date).map((item) => ({
-  name: [item.vaccine_name || item.vaccine || item.name, item.dose || ''].filter(Boolean).join(' · '),
-  date: item.suggested_date || item.date,
-  status: item.status || '计划中',
-}));
+const vaccinesOf = (value) => arrayOf(value, ['vaccines', 'vaccine_records', 'schedule', 'items']).map((item) => {
+  const actualDate = item.actual_date || item.actualDate || item.done_date || item.doneDate || '';
+  return {
+    planId: item.plan_id || item.planId || '',
+    name: [item.vaccine_name || item.vaccine || item.name, item.dose || ''].filter(Boolean).join(' · '),
+    date: item.suggested_date || item.suggestedDate || item.date,
+    actualDate,
+    ageLabel: item.age_label || item.ageLabel || '',
+    status: actualDate ? '已完成' : item.status || '计划中',
+  };
+}).filter((item) => item.date);
 
 function careOf(value) {
   const milestones = arrayOf(value?.milestones || value, ['milestones', 'items']).map((item) => ({

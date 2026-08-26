@@ -61,6 +61,23 @@ function App() {
     const today = new Date().toISOString().slice(0, 10);
     return (data.care?.milestones || []).find((item) => item.date >= today) || data.care?.milestones?.at(-1);
   }, [data.care]);
+  const carePlan = useMemo(() => {
+    const vaccines = (data.vaccines || []).map((item) => ({
+      ...item,
+      recordType: 'vaccine',
+      source: item.source || '疫苗',
+    }));
+    const careMilestones = (data.care?.milestones || []).map((item) => ({
+      ...item,
+      recordType: 'care',
+      source: item.source || '卓正儿保',
+    }));
+
+    return [...vaccines, ...careMilestones]
+      .map((item, originalIndex) => ({ ...item, originalIndex }))
+      .filter((item) => item.date)
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.originalIndex - b.originalIndex);
+  }, [data.vaccines, data.care?.milestones]);
   const updatedAt = data.meta?.updatedAt
     ? new Date(data.meta.updatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     : '--:--';
@@ -96,7 +113,7 @@ function App() {
           months={months} currentMonth={currentMonth} expenseChange={expenseChange}
           nextVaccine={nextVaccine} nextCare={nextCare} onNavigate={selectView}
         />}
-        {view === 'growth' && <GrowthView weights={weights} vaccines={data.vaccines || []} care={data.care || emptyData.care} latestWeight={latestWeight} weightChange={weightChange}/>}
+        {view === 'growth' && <GrowthView weights={weights} carePlan={carePlan} latestWeight={latestWeight} weightChange={weightChange}/>}
         {view === 'ledger' && <LedgerView months={months} transactions={data.ledger?.transactions || []} currentMonth={currentMonth} expenseChange={expenseChange}/>}
         {view === 'pantry' && <PantryView pantry={data.pantry || emptyData.pantry}/>}
       </div>
@@ -143,7 +160,7 @@ function Overview({ data, weights, latestWeight, weightChange, months, currentMo
   </>;
 }
 
-function GrowthView({ weights, vaccines, care, latestWeight, weightChange }) {
+function GrowthView({ weights, carePlan, latestWeight, weightChange }) {
   return <div className="detail-layout">
     <section className="section-card detail-main">
       <SectionTitle eyebrow="成长趋势" title="体重记录"/>
@@ -158,25 +175,39 @@ function GrowthView({ weights, vaccines, care, latestWeight, weightChange }) {
       </div>
     </section>
     <div className="detail-stack">
-      <section className="section-card detail-side">
-        <SectionTitle eyebrow="接种安排" title="近期疫苗"/>
-        <div className="timeline">{vaccines.slice(0, 8).map((item, index) => <div className="timeline-item" key={item.name + item.date}><i className={index === 0 ? 'current' : ''}/><div><span>{formatDate(item.date)}</span><strong>{item.name}</strong></div></div>)}</div>
-      </section>
-      <section className="section-card detail-side">
-        <SectionTitle eyebrow={care?.provider || '儿童保健'} title="儿保计划"/>
-        <CareTimeline care={care}/>
+      <section className="section-card detail-side care-plan-card">
+        <SectionTitle eyebrow="疫苗 · 卓正儿保" title="儿童保健计划"/>
+        <CarePlanTimeline items={carePlan}/>
       </section>
     </div>
   </div>;
 }
 
-function CareTimeline({ care }) {
+function CarePlanTimeline({ items }) {
   const today = new Date().toISOString().slice(0, 10);
-  const items = care?.milestones || [];
-  const nextIndex = items.findIndex((item) => item.date >= today);
-  if (!items.length) return <Empty text="暂无儿保计划"/>;
-  return <div className="timeline care-timeline">{items.map((item, index) => <div className="timeline-item" key={item.id || item.date}><i className={index === nextIndex ? 'current' : index < nextIndex || nextIndex < 0 ? 'done' : ''}/><div><span>{formatDate(item.date)}{item.weekday ? ' · ' + item.weekday : ''}</span><strong>{item.label}</strong></div></div>)}</div>;
+  const nextIndex = items.findIndex((item) => !item.actualDate && !isCompletedStatus(item.status) && item.date >= today);
+  if (!items.length) return <Empty text="暂无儿童保健计划"/>;
+  return <div className="timeline care-timeline">{items.map((item, index) => {
+    const completed = Boolean(item.actualDate) || isCompletedStatus(item.status) || index < nextIndex || nextIndex < 0;
+    const markerClass = completed ? 'done' : index === nextIndex ? 'current' : '';
+    return <div className="timeline-item" key={[item.recordType, item.planId || item.id || item.name || item.label, item.date, item.originalIndex].join('-')}>
+      <i className={markerClass}/>
+      <div>
+        <div className="timeline-meta">
+          <span>{formatDate(item.date)}{item.weekday ? ' · ' + item.weekday : ''}</span>
+          <b className={'source-tag ' + item.recordType}>{item.source || (item.recordType === 'vaccine' ? '疫苗' : '卓正儿保')}</b>
+          {item.status && <em>{item.status}</em>}
+        </div>
+        <strong>{item.name || item.label}</strong>
+      </div>
+    </div>;
+  })}</div>;
 }
+
+function isCompletedStatus(status) {
+  return /(已完成|已接种|completed|done)/i.test(String(status || ''));
+}
+
 function LedgerView({ months, transactions, currentMonth, expenseChange }) {
   return <>
     <section className="metric-grid compact">

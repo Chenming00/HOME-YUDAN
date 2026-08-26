@@ -148,6 +148,11 @@ button:focus-visible{outline:3px solid rgba(47,125,115,.24);outline-offset:2px}
 .timeline-item span,.timeline-item strong{display:block}
 .timeline-item span{font-size:8px;color:var(--muted);margin-bottom:5px}
 .timeline-item strong{font-size:10px;line-height:1.4}
+.timeline-meta{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-bottom:5px}
+.timeline-meta span{margin-bottom:0}
+.timeline-meta em{color:var(--muted);font-size:8px;font-style:normal}
+.source-tag{border-radius:999px;padding:2px 6px;background:var(--teal-soft);color:var(--teal);font-size:8px;font-weight:650;line-height:1.4}
+.source-tag.vaccine{background:var(--blue-soft);color:var(--blue)}
 .inventory-table{width:100%}
 .inventory-head,.inventory-row{display:grid;grid-template-columns:minmax(0,1fr) 130px 100px;gap:16px;align-items:center;padding:12px 3px;border-bottom:1px solid #eef0ee}
 .inventory-head{padding-top:0;color:#9099a1;font-size:8px;font-weight:650}
@@ -283,6 +288,7 @@ button,input{font-family:inherit}
 .table-row{font-size:12px}
 .table-row strong{font-size:12px;font-weight:650;font-variant-numeric:tabular-nums}
 .timeline-item span{font-size:10px}
+.timeline-meta em,.source-tag{font-size:10px}
 .timeline-item strong{font-size:12px;font-weight:600;line-height:1.5}
 .inventory-row strong{font-size:13px;font-weight:600}
 .inventory-row>b{font-size:12px;font-weight:650;font-variant-numeric:tabular-nums}
@@ -308,6 +314,7 @@ button,input{font-family:inherit}
   .expense-value,.expense-column>span{font-size:9px}
   .timeline-item strong{font-size:12px}
   .timeline-item span{font-size:10px}
+  .timeline-meta em,.source-tag{font-size:9px}
   .inventory-row strong{font-size:12px}
   .inventory-row>b{font-size:11px}
   .mobile-nav button{font-size:10px;font-weight:500;line-height:1.2}
