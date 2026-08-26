@@ -129,13 +129,11 @@ function App() {
 
   const nextVaccine = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-  const favoriteCount = pantry.favorites?.length || 0;
     return (data.vaccines || []).find((item) => item.date >= today) || data.vaccines?.[0];
   }, [data.vaccines]);
 
   const nextCare = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-  const favoriteCount = pantry.favorites?.length || 0;
     return (data.care?.milestones || []).find((item) => item.date >= today) || data.care?.milestones?.at(-1);
   }, [data.care]);
 
@@ -144,7 +142,6 @@ function App() {
     if (nextVaccine) candidates.push({ ...nextVaccine, type: 'vaccine', label: nextVaccine.name });
     if (nextCare) candidates.push({ ...nextCare, type: 'care', label: nextCare.label });
     const today = new Date().toISOString().slice(0, 10);
-  const favoriteCount = pantry.favorites?.length || 0;
     return candidates
       .filter((item) => item.date)
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))
@@ -422,7 +419,6 @@ function Overview({ data, weights, latestWeight, weightChange, months, currentMo
                     <b>{item.suggested > 0 ? `补 ${item.suggested}` : `剩 ${item.stock}`} {item.unit}</b>
                   </div>
                 ))}
-                {favoriteCount > 4 && <p className="favorite-more">还有 {favoriteCount - 4} 项常用用品，可在库存页查看</p>}
               </div>
             ) : <Empty text="当前没有需要补货的用品" />}
           </section>
@@ -551,7 +547,6 @@ function GrowthView({ weights, carePlan, latestWeight, weightChange }) {
 
 function CarePlanTimeline({ items }) {
   const today = new Date().toISOString().slice(0, 10);
-  const favoriteCount = pantry.favorites?.length || 0;
   const [expanded, setExpanded] = useState(false);
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
