@@ -21,21 +21,32 @@ function arrayOf(value, keys = []) {
   return [];
 }
 
+function shanghaiYearMonth(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit',
+  }).formatToParts(date);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return { year: Number(value.year), month: Number(value.month) };
+}
+
 async function readMonthlySeries() {
-  const today = new Date();
+  const current = shanghaiYearMonth();
   const targets = Array.from({ length: 6 }, (_, index) => {
-    const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - (5 - index), 1));
+    const date = new Date(Date.UTC(current.year, current.month - 1 - (5 - index), 1));
     return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1 };
   });
   const results = await Promise.all(targets.map(({ year, month }) => read(LOG_BASE, `/api/monthly?year=${year}&month=${month}`)));
+  const successCount = results.filter((result) => result.ok).length;
   return {
-    ok: results.some((result) => result.ok),
+    ok: successCount === results.length,
+    partial: successCount > 0 && successCount < results.length,
     data: results.map((result, index) => ({
       month: `${targets[index].month}月`,
       income: 0,
-      expense: Number(result.data?.totalExpense || 0),
-      transactionCount: Number(result.data?.transactionCount || 0),
-      categoryBreakdown: arrayOf(result.data?.categoryBreakdown),
+      expense: result.ok ? Number(result.data?.totalExpense || 0) : null,
+      transactionCount: result.ok ? Number(result.data?.transactionCount || 0) : null,
+      categoryBreakdown: result.ok ? arrayOf(result.data?.categoryBreakdown) : [],
+      available: result.ok,
     })),
   };
 }
@@ -78,33 +89,48 @@ function careOf(value) {
   };
 }
 function pantryOf(value, products, attention) {
-  const all = arrayOf(products, ['products', 'items']);
+  const productsList = arrayOf(products, ['products', 'items']);
   const alerts = arrayOf(attention, ['batches', 'items']);
   const replenishment = arrayOf(value?.replenishList);
   const favorites = arrayOf(value?.favorites);
-  const source = replenishment.length ? replenishment : arrayOf(value, ['searchItems', 'attention', 'restock', 'items', 'products']);
+  const inventory = arrayOf(value?.searchItems);
   const toItem = (item) => {
-    const stock = Number(item.stock ?? item.current_stock ?? item.quantity ?? item.total_quantity ?? 0);
+    const rawStock = item.stock ?? item.current_stock ?? item.quantity ?? item.total_quantity;
+    const stock = rawStock === undefined || rawStock === null ? null : Number(rawStock);
     const minimum = Number(item.min_stock ?? item.minimum_stock ?? item.safety_stock ?? 0);
+    const fallbackStatus = stock === null
+      ? '库存未知'
+      : minimum > 0 && stock <= 0
+        ? '已缺货'
+        : minimum > 0 && stock <= minimum
+          ? '库存偏低'
+          : '正常';
     return {
+      code: item.product_code || item.code || item.product?.product_code || '',
       name: item.name || item.product_name || item.product?.name,
+      category: item.category || item.product?.category || '未分类',
+      note: item.note || '',
       stock,
       minimum,
-      suggested: Number(item.suggest ?? item.suggested_quantity ?? Math.max(0, minimum - stock)),
+      suggested: Number(item.suggest ?? item.suggested_quantity ?? (stock === null ? 0 : Math.max(0, minimum - stock))),
       unit: item.unit || item.product?.unit || '',
-      status: stock <= 0 ? '已缺货' : stock <= minimum ? '库存偏低' : (item.status_text || item.alert || item.status || '正常'),
+      status: item.status_text || item.alert || item.status || fallbackStatus,
     };
   };
-  const items = source.map(toItem).filter((item) => item.name);
+  const unique = (items) => [...new Map(items.filter((item) => item.name).map((item) => [item.code || item.name, item])).values()];
+  const items = unique(replenishment.map(toItem));
+  const favoriteItems = unique(favorites.map(toItem));
+  const allItems = unique((inventory.length ? inventory : productsList).map(toItem));
   const stats = value || {};
   return {
-    total: Number(stats.productCount ?? stats.total_products ?? stats.active_products ?? all.length ?? items.length),
+    total: Number(stats.productCount ?? stats.total_products ?? stats.active_products ?? (productsList.length || allItems.length)),
     low: Number(stats.lowStockCount ?? stats.low_stock ?? stats.low_stock_count ?? 0),
     outOfStock: Number(stats.outOfStockCount ?? stats.out_of_stock ?? stats.out_of_stock_count ?? 0),
     nearExpiry: Number(stats.nearExpiryCount ?? stats.near_expiry ?? stats.near_expiry_count ?? alerts.length ?? 0),
     expired: Number(stats.expiredCount ?? stats.expired_count ?? 0),
     items,
-    favorites: favorites.map(toItem).filter((item) => item.name),
+    favorites: favoriteItems,
+    allItems,
   };
 }
 
@@ -122,8 +148,9 @@ export default async function handler(request, response) {
     read(PANTRY_BASE, '/api/products?active=1'),
     read(PANTRY_BASE, '/api/batches?filter=attention', pantryKey),
   ]);
+  const ledgerOk = monthly.ok && list.ok;
   const sources = [
-    { name: '鱼蛋小账本', ok: monthly.ok || list.ok },
+    { name: '鱼蛋小账本', ok: ledgerOk, partial: !ledgerOk && (monthly.partial || monthly.ok || list.ok) },
     { name: '鱼蛋成长看板', ok: growth.ok, requiresKey: !logKey },
     { name: '鱼蛋儿保计划', ok: care.ok, requiresKey: !logKey },
     { name: '鱼蛋宝贝消耗品', ok: dashboard.ok || products.ok, requiresKey: !pantryKey && !dashboard.ok },

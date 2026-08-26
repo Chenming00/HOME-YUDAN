@@ -30,7 +30,7 @@ const emptyData = {
   growth: { weights: [] },
   vaccines: [],
   care: { provider: '', birthday: '', milestones: [] },
-  pantry: { total: 0, low: 0, outOfStock: 0, nearExpiry: 0, expired: 0, items: [], favorites: [] },
+  pantry: { total: 0, low: 0, outOfStock: 0, nearExpiry: 0, expired: 0, items: [], favorites: [], allItems: [] },
 };
 
 const navigation = [
@@ -47,6 +47,14 @@ const BABY_BIRTHDAY_FALLBACK = '2026-08-30';
 function daysBetween(a, b) {
   const ms = new Date(b + 'T00:00:00').getTime() - new Date(a + 'T00:00:00').getTime();
   return Math.floor(ms / 86400000);
+}
+
+function shanghaiDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
 }
 
 function formatCurrency(value) {
@@ -76,7 +84,50 @@ function isCompletedStatus(status) {
   return /(已完成|已接种|completed|done)/i.test(String(status || ''));
 }
 
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, [query]);
+
+  return matches;
+}
+
 /* ---------- Main App ---------- */
+
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error) {
+    console.error('Yudan Home render failed', error);
+  }
+
+  render() {
+    if (this.state.failed) {
+      return (
+        <main className="fatal-error" role="alert">
+          <AlertCircle size={28} />
+          <h1>页面暂时无法显示</h1>
+          <p>数据没有被修改，请刷新页面重试。</p>
+          <button onClick={() => window.location.reload()}>重新加载</button>
+        </main>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function App() {
   const [data, setData] = useState(emptyData);
@@ -110,12 +161,21 @@ function App() {
       setTopbarScrolled(y > 8);
       if (window.innerWidth < 768) {
         setTopbarHidden(y > 120 && y > lastScrollY.current);
+      } else {
+        setTopbarHidden(false);
       }
       setShowBackToTop(y > 400);
       lastScrollY.current = y;
     };
+    const onResize = () => {
+      if (window.innerWidth >= 768) setTopbarHidden(false);
+    };
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onResize);
+    };
   }, []);
 
   const weights = data.growth?.weights || [];
@@ -125,23 +185,27 @@ function App() {
   const months = data.ledger?.monthly || [];
   const currentMonth = months.at(-1);
   const previousMonth = months.at(-2);
-  const expenseChange = currentMonth && previousMonth ? currentMonth.expense - previousMonth.expense : null;
+  const expenseChange = currentMonth?.available !== false && previousMonth?.available !== false && currentMonth && previousMonth
+    ? currentMonth.expense - previousMonth.expense
+    : null;
 
   const nextVaccine = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return (data.vaccines || []).find((item) => item.date >= today) || data.vaccines?.[0];
+    const today = shanghaiDateKey();
+    return (data.vaccines || [])
+      .filter((item) => item.date >= today && !item.actualDate && !isCompletedStatus(item.status))
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] || null;
   }, [data.vaccines]);
 
   const nextCare = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return (data.care?.milestones || []).find((item) => item.date >= today) || data.care?.milestones?.at(-1);
+    const today = shanghaiDateKey();
+    return (data.care?.milestones || []).find((item) => item.date >= today) || null;
   }, [data.care]);
 
   const nextEvent = useMemo(() => {
     const candidates = [];
     if (nextVaccine) candidates.push({ ...nextVaccine, type: 'vaccine', label: nextVaccine.name });
     if (nextCare) candidates.push({ ...nextCare, type: 'care', label: nextCare.label });
-    const today = new Date().toISOString().slice(0, 10);
+    const today = shanghaiDateKey();
     return candidates
       .filter((item) => item.date)
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))
@@ -170,7 +234,7 @@ function App() {
     : '--:--';
 
   const birthday = data.care?.birthday || BABY_BIRTHDAY_FALLBACK;
-  const babyDays = daysBetween(birthday, new Date().toISOString().slice(0, 10));
+  const babyDays = daysBetween(birthday, shanghaiDateKey());
 
   const selectView = (id) => {
     setView(id);
@@ -181,7 +245,7 @@ function App() {
     <div className="shell">
       <aside className="sidebar">
         <div className="identity">
-          <div className="identity-mark">Y</div>
+          <div className="identity-mark"><img src="/icons/pwa-192.png" alt="" /></div>
           <div>
             <strong>鱼蛋家庭</strong>
             <span>生活数据中心</span>
@@ -363,7 +427,7 @@ function SectionSkeleton({ tall }) {
 
 function Overview({ data, weights, latestWeight, weightChange, months, currentMonth, expenseChange, nextVaccine, nextCare, nextEvent, babyDays, birthday, onNavigate }) {
   const pantry = data.pantry || emptyData.pantry;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = shanghaiDateKey();
   const favoriteCount = pantry.favorites?.length || 0;
 
   return (
@@ -373,7 +437,7 @@ function Overview({ data, weights, latestWeight, weightChange, months, currentMo
       <section className="metric-grid editorial-metrics" aria-label="家庭关键数据">
         <Metric icon={Baby} tone="teal" label="最新体重" value={latestWeight ? formatWeight(latestWeight.weight) : '暂无记录'} unit={latestWeight ? 'kg' : ''} detail={latestWeight ? formatDate(latestWeight.date) : '成长数据'} delta={weightChange} deltaUnit=" kg" deltaType="weight" />
         <Metric icon={Syringe} tone="blue" label="下次疫苗" value={nextVaccine ? formatDate(nextVaccine.date, true) : '暂无计划'} detail={nextVaccine?.name || '疫苗计划'} />
-        <Metric icon={CircleDollarSign} tone="red" label="本月支出" value={formatCurrency(currentMonth?.expense || 0)} detail={`${currentMonth?.transactionCount || 0} 笔家庭账目`} delta={expenseChange} currencyDelta deltaType="expense" />
+        <Metric icon={CircleDollarSign} tone="red" label="本月支出" value={currentMonth?.available === false ? '暂无数据' : formatCurrency(currentMonth?.expense || 0)} detail={currentMonth?.available === false ? '本月账本接口不可用' : `${currentMonth?.transactionCount || 0} 笔家庭账目`} delta={expenseChange} currencyDelta deltaType="expense" />
         <Metric icon={ShoppingBag} tone="amber" label="用品提醒" value={String(pantry.low || 0)} unit="项" detail={`${pantry.nearExpiry || 0} 项临期 · ${pantry.expired || 0} 项过期`} />
       </section>
 
@@ -475,7 +539,7 @@ function HeroCard({ babyDays, birthday, nextEvent, today, latestWeight }) {
             <div>
               <span>下一项安排</span>
               <strong>{nextEvent.label}</strong>
-              <em>{daysToEvent <= 0 ? '就在今天' : `${daysToEvent} 天后`}</em>
+              <em>{daysToEvent === 0 ? '就在今天' : daysToEvent > 0 ? `${daysToEvent} 天后` : `${Math.abs(daysToEvent)} 天前`}</em>
             </div>
           </div>
         )}
@@ -498,7 +562,7 @@ function NextEventCard({ event, type, subtitle, today, compact = false }) {
         <span>{subtitle}</span>
         <div className="countdown-pill">
           <Sparkles size={11} />
-          {daysLeft <= 0 ? '今天' : `${daysLeft} 天后`}
+          {daysLeft === 0 ? '今天' : daysLeft > 0 ? `${daysLeft} 天后` : `${Math.abs(daysLeft)} 天前`}
         </div>
       </div>
     </div>
@@ -546,18 +610,19 @@ function GrowthView({ weights, carePlan, latestWeight, weightChange }) {
 }
 
 function CarePlanTimeline({ items }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = shanghaiDateKey();
   const [expanded, setExpanded] = useState(false);
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const isMobile = useMediaQuery('(max-width: 767px)');
 
   const nextIndex = items.findIndex((item) => !item.actualDate && !isCompletedStatus(item.status) && item.date >= today);
+  const collapseStart = nextIndex > 0 ? Math.max(0, nextIndex - 1) : 0;
 
   const visibleItems = useMemo(() => {
-    if (!isMobile || expanded || nextIndex <= 0) return items;
-    return items.filter((_, index) => index >= Math.max(0, nextIndex - 1));
-  }, [items, isMobile, expanded, nextIndex]);
+    if (!isMobile || expanded || collapseStart === 0) return items;
+    return items.slice(collapseStart);
+  }, [items, isMobile, expanded, collapseStart]);
 
-  const hiddenCount = items.length - visibleItems.length;
+  const hiddenCount = collapseStart;
 
   if (!items.length) return <Empty text="暂无儿童保健计划" />;
 
@@ -565,9 +630,9 @@ function CarePlanTimeline({ items }) {
     <>
       <div className="timeline care-timeline">
         {visibleItems.map((item) => {
-          const originalIndex = items.indexOf(item);
-          const completed = Boolean(item.actualDate) || isCompletedStatus(item.status) || originalIndex < nextIndex || nextIndex < 0;
-          const markerClass = completed ? 'done' : item === items[nextIndex] ? 'current' : '';
+          const completed = Boolean(item.actualDate) || isCompletedStatus(item.status);
+          const overdue = !completed && item.date < today;
+          const markerClass = completed ? 'done' : item === items[nextIndex] ? 'current' : overdue ? 'overdue' : '';
           return (
             <div className="timeline-item" key={[item.recordType, item.planId || item.id || item.name || item.label, item.date, item.originalIndex].join('-')}>
               <i className={markerClass} />
@@ -598,9 +663,9 @@ function LedgerView({ months, transactions, currentMonth, expenseChange }) {
   return (
     <>
       <section className="metric-grid compact three">
-        <Metric icon={CircleDollarSign} tone="red" label="本月支出" value={formatCurrency(currentMonth?.expense || 0)} detail="当前自然月" delta={expenseChange} currencyDelta deltaType="expense" />
-        <Metric icon={WalletCards} tone="teal" label="本月笔数" value={String(currentMonth?.transactionCount || 0)} unit="笔" detail="交易记录" />
-        <Metric icon={CalendarDays} tone="blue" label="近六个月" value={formatCurrency(months.reduce((sum, item) => sum + Number(item.expense || 0), 0))} detail="累计支出" />
+        <Metric icon={CircleDollarSign} tone="red" label="本月支出" value={currentMonth?.available === false ? '暂无数据' : formatCurrency(currentMonth?.expense || 0)} detail={currentMonth?.available === false ? '本月账本接口不可用' : '当前自然月'} delta={expenseChange} currencyDelta deltaType="expense" />
+        <Metric icon={WalletCards} tone="teal" label="本月笔数" value={currentMonth?.available === false ? '--' : String(currentMonth?.transactionCount || 0)} unit={currentMonth?.available === false ? '' : '笔'} detail="交易记录" />
+        <Metric icon={CalendarDays} tone="blue" label="近六个月" value={formatCurrency(months.reduce((sum, item) => sum + Number(item.expense || 0), 0))} detail={months.some((item) => item.available === false) ? '仅统计已同步月份' : '累计支出'} />
       </section>
       <div className="detail-layout ledger-layout">
         <section className="section-card detail-main">
@@ -625,7 +690,27 @@ function PantryView({ pantry }) {
         <Metric icon={PackageCheck} tone="teal" label="启用商品" value={String(pantry.total || 0)} unit="种" detail="用品总数" />
         <Metric icon={AlertCircle} tone="red" label="已缺货" value={String(pantry.outOfStock || 0)} unit="项" detail="需要优先购买" />
         <Metric icon={ShoppingBag} tone="amber" label="待补货" value={String(pantry.low || 0)} unit="项" detail="达到安全线" />
-        <Metric icon={CalendarDays} tone="blue" label="近期临期" value={String((pantry.nearExpiry || 0) + (pantry.expired || 0))} unit="项" detail={`${pantry.nearExpiry || 0} 项临期 · ${pantry.expired || 0} 项过期`} />
+        <Metric icon={CalendarDays} tone="blue" label="临期与过期" value={String((pantry.nearExpiry || 0) + (pantry.expired || 0))} unit="项" detail={`${pantry.nearExpiry || 0} 项临期 · ${pantry.expired || 0} 项过期`} />
+      </section>
+      <section className="section-card pantry-favorites">
+        <SectionTitle eyebrow="常用余量" title={`常用用品 · ${pantry.favorites?.length || 0} 项`} />
+        <div className="inventory-table">
+          <div className="inventory-head"><span>商品</span><span>当前库存</span><span>状态</span></div>
+          {pantry.favorites?.length ? (
+            pantry.favorites.map((item) => (
+              <div className="inventory-row" key={item.name}>
+                <div>
+                  <span className="item-icon"><PackageCheck size={16} /></span>
+                  <strong>{item.name}</strong>
+                </div>
+                <b>{item.stock} {item.unit}</b>
+                <StatusTag status={item.status} />
+              </div>
+            ))
+          ) : (
+            <Empty text="暂无常用用品" />
+          )}
+        </div>
       </section>
       <section className="section-card">
         <SectionTitle eyebrow="库存关注" title="补货清单" />
@@ -644,6 +729,29 @@ function PantryView({ pantry }) {
             ))
           ) : (
             <Empty text="当前没有需要关注的库存" />
+          )}
+        </div>
+      </section>
+      <section className="section-card pantry-all">
+        <SectionTitle eyebrow="全部用品" title={`完整库存 · ${pantry.allItems?.length || 0} 项`} />
+        <div className="inventory-table">
+          <div className="inventory-head"><span>商品</span><span>当前库存</span><span>状态</span></div>
+          {pantry.allItems?.length ? (
+            pantry.allItems.map((item) => (
+              <div className="inventory-row" key={item.code || item.name}>
+                <div>
+                  <span className="item-icon"><PackageCheck size={16} /></span>
+                  <span className="inventory-name">
+                    <strong>{item.name}</strong>
+                    <small>{item.category || '未分类'}{item.minimum > 0 ? ` · 安全线 ${item.minimum} ${item.unit}` : ''}</small>
+                  </span>
+                </div>
+                <b>{item.stock ?? '--'} {item.unit}</b>
+                <StatusTag status={item.status} />
+              </div>
+            ))
+          ) : (
+            <Empty text="暂无完整库存数据" />
           )}
         </div>
       </section>
@@ -720,6 +828,11 @@ function WeightChart({ weights, large }) {
   const y = (value) => 20 + (high - value) / Math.max(high - low, 0.1) * (height - 58);
   const points = items.map((item, index) => x(index) + ',' + y(item.weight)).join(' ');
   const areaPoints = `${x(0)},${height - 38} ${points} ${x(items.length - 1)},${height - 38}`;
+  const showPoint = (item, index) => setTooltip({
+    x: (x(index) / width) * 100,
+    y: (y(item.weight) / height) * 100,
+    text: `${formatDate(item.date)} · ${formatWeight(item.weight)} kg`,
+  });
 
   const gridLines = [0.25, 0.5, 0.75].map((ratio) => (
     <line
@@ -737,8 +850,8 @@ function WeightChart({ weights, large }) {
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="体重趋势图">
         <defs>
           <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--teal-500)" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="var(--teal-500)" stopOpacity="0.02" />
+            <stop offset="0%" stopColor="var(--moss)" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="var(--moss)" stopOpacity="0.02" />
           </linearGradient>
         </defs>
         {gridLines}
@@ -746,18 +859,23 @@ function WeightChart({ weights, large }) {
         <polyline points={areaPoints} className="weight-area" />
         <polyline points={points} className="weight-line" />
         {items.map((item, index) => (
-          <g key={item.date}>
+          <g
+            key={item.date}
+            tabIndex="0"
+            role="button"
+            aria-label={`${formatDate(item.date)}，${formatWeight(item.weight)} 千克`}
+            onFocus={() => showPoint(item, index)}
+            onBlur={() => setTooltip(null)}
+            onPointerEnter={() => showPoint(item, index)}
+            onPointerLeave={() => setTooltip(null)}
+            onClick={() => showPoint(item, index)}
+          >
+            <circle cx={x(index)} cy={y(item.weight)} r="14" className="chart-hit-area" />
             <circle
               cx={x(index)}
               cy={y(item.weight)}
               r={index === items.length - 1 ? 6 : 4}
               className={index === items.length - 1 ? 'point latest' : 'point'}
-              onMouseEnter={() => setTooltip({
-                x: (x(index) / width) * 100,
-                y: (y(item.weight) / height) * 100,
-                text: `${formatDate(item.date)} · ${formatWeight(item.weight)} kg`,
-              })}
-              onMouseLeave={() => setTooltip(null)}
             />
             <text x={x(index)} y={height - 16} textAnchor="middle" className="chart-label">{shortDate(item.date)}</text>
             {(large || index === items.length - 1) && (
@@ -768,7 +886,7 @@ function WeightChart({ weights, large }) {
       </svg>
       {tooltip && (
         <div
-          className={`chart-tooltip ${tooltip ? 'visible' : ''}`}
+          className={`chart-tooltip ${tooltip ? 'visible' : ''}`} aria-live="polite"
           style={{ left: `${tooltip.x}%`, top: `${tooltip.y}%` }}
         >
           {tooltip.text}
@@ -780,10 +898,10 @@ function WeightChart({ weights, large }) {
 
 function ExpenseChart({ months, large }) {
   if (!months.length) return <Empty text="暂无支出记录" />;
-  const max = Math.max(...months.map((item) => Number(item.expense || 0)), 1);
+  const max = Math.max(...months.filter((item) => item.available !== false).map((item) => Number(item.expense || 0)), 1);
   const currentMonthLabels = [
-    new Date().toISOString().slice(0, 7),
-    `${new Date().getMonth() + 1}月`,
+    shanghaiDateKey().slice(0, 7),
+    `${Number(shanghaiDateKey().slice(5, 7))}月`,
   ];
 
   return (
@@ -791,10 +909,10 @@ function ExpenseChart({ months, large }) {
       {months.map((item) => {
         const isCurrent = currentMonthLabels.includes(item.month);
         return (
-          <div className={`expense-column ${isCurrent ? 'current' : ''}`} key={item.month}>
-            <div className="expense-value">{item.expense ? compactCurrency(item.expense) : '¥0'}</div>
+          <div className={`expense-column ${isCurrent ? 'current' : ''} ${item.available === false ? 'unavailable' : ''}`} key={item.month}>
+            <div className="expense-value">{item.available === false ? '--' : item.expense ? compactCurrency(item.expense) : '¥0'}</div>
             <div className="expense-track">
-              <div className="expense-bar" style={{ height: Math.max(4, Number(item.expense || 0) / max * 100) + '%' }} />
+              <div className="expense-bar" style={{ height: item.available === false ? '0%' : Math.max(4, Number(item.expense || 0) / max * 100) + '%' }} />
             </div>
             <span>{item.month}</span>
           </div>
@@ -835,10 +953,10 @@ function SourceStatus({ sources }) {
   return (
     <div className="source-strip">
       {sources.map((source) => (
-        <span key={source.name} className={source.ok ? 'online' : 'offline'}>
+        <span key={source.name} className={source.ok ? 'online' : source.partial ? 'partial' : 'offline'}>
           <i />
           {source.name}
-          <b>{source.ok ? '已连接' : '待配置'}</b>
+          <b>{source.ok ? '已连接' : source.partial ? '部分可用' : '待配置'}</b>
         </span>
       ))}
     </div>
@@ -876,4 +994,18 @@ function Empty({ text }) {
   );
 }
 
-createRoot(document.getElementById('root')).render(<App />);
+if (typeof document !== 'undefined') {
+  createRoot(document.getElementById('root')).render(
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>,
+  );
+}
+
+export { App, AppErrorBoundary, shanghaiDateKey };
+
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
