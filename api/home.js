@@ -56,6 +56,19 @@ const vaccinesOf = (value) => arrayOf(value, ['vaccines', 'schedule', 'items']).
   status: item.status || '计划中',
 }));
 
+function careOf(value) {
+  const milestones = arrayOf(value?.milestones || value, ['milestones', 'items']).map((item) => ({
+    id: item.id || item.label || item.date,
+    label: item.label || item.name || '儿童保健',
+    date: item.date,
+    weekday: item.weekday || '',
+  })).filter((item) => item.date).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  return {
+    provider: value?.provider || '',
+    birthday: value?.birthday || '',
+    milestones,
+  };
+}
 function pantryOf(value, products, attention) {
   const all = arrayOf(products, ['products', 'items']);
   const alerts = arrayOf(attention, ['batches', 'items']);
@@ -79,11 +92,12 @@ export default async function handler(request, response) {
   if (request.method !== 'GET') return response.status(405).json({ message: 'Method Not Allowed' });
   const logKey = process.env.YUDAN_LOG_API_KEY;
   const pantryKey = process.env.YUDAN_PANTRY_API_KEY;
-  const [monthly, list, growth, vaccines, dashboard, products, attention] = await Promise.all([
+  const [monthly, list, growth, vaccines, care, dashboard, products, attention] = await Promise.all([
     readMonthlySeries(),
     read(LOG_BASE, '/api/list?limit=8'),
     read(LOG_BASE, '/api/yudan', logKey),
     read(LOG_BASE, '/api/yudan/vaccines', logKey),
+    read(LOG_BASE, '/api/yudan/care', logKey),
     read(PANTRY_BASE, '/api/dashboard'),
     read(PANTRY_BASE, '/api/products?active=1'),
     read(PANTRY_BASE, '/api/batches?filter=attention', pantryKey),
@@ -91,6 +105,7 @@ export default async function handler(request, response) {
   const sources = [
     { name: '鱼蛋小账本', ok: monthly.ok || list.ok },
     { name: '鱼蛋成长看板', ok: growth.ok, requiresKey: !logKey },
+    { name: '鱼蛋儿保计划', ok: care.ok, requiresKey: !logKey },
     { name: '鱼蛋宝贝消耗品', ok: dashboard.ok || products.ok, requiresKey: !pantryKey && !dashboard.ok },
   ];
   response.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=600');
@@ -99,6 +114,7 @@ export default async function handler(request, response) {
     ledger: { monthly: monthly.data, transactions: transactionsOf(list.data) },
     growth: { weights: weightsOf(growth.data) },
     vaccines: vaccinesOf(vaccines.data),
+    care: careOf(care.data),
     pantry: pantryOf(dashboard.data, products.data, attention.data),
   });
 }

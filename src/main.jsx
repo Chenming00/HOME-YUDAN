@@ -12,6 +12,7 @@ const emptyData = {
   ledger: { monthly: [], transactions: [] },
   growth: { weights: [] },
   vaccines: [],
+  care: { provider: '', birthday: '', milestones: [] },
   pantry: { total: 0, low: 0, nearExpiry: 0, items: [] },
 };
 
@@ -56,6 +57,10 @@ function App() {
     const today = new Date().toISOString().slice(0, 10);
     return (data.vaccines || []).find((item) => item.date >= today) || data.vaccines?.[0];
   }, [data.vaccines]);
+  const nextCare = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return (data.care?.milestones || []).find((item) => item.date >= today) || data.care?.milestones?.at(-1);
+  }, [data.care]);
   const updatedAt = data.meta?.updatedAt
     ? new Date(data.meta.updatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     : '--:--';
@@ -89,9 +94,9 @@ function App() {
         {view === 'overview' && <Overview
           data={data} weights={weights} latestWeight={latestWeight} weightChange={weightChange}
           months={months} currentMonth={currentMonth} expenseChange={expenseChange}
-          nextVaccine={nextVaccine} onNavigate={selectView}
+          nextVaccine={nextVaccine} nextCare={nextCare} onNavigate={selectView}
         />}
-        {view === 'growth' && <GrowthView weights={weights} vaccines={data.vaccines || []} latestWeight={latestWeight} weightChange={weightChange}/>}
+        {view === 'growth' && <GrowthView weights={weights} vaccines={data.vaccines || []} care={data.care || emptyData.care} latestWeight={latestWeight} weightChange={weightChange}/>}
         {view === 'ledger' && <LedgerView months={months} transactions={data.ledger?.transactions || []} currentMonth={currentMonth} expenseChange={expenseChange}/>}
         {view === 'pantry' && <PantryView pantry={data.pantry || emptyData.pantry}/>}
       </div>
@@ -101,7 +106,7 @@ function App() {
   </div>;
 }
 
-function Overview({ data, weights, latestWeight, weightChange, months, currentMonth, expenseChange, nextVaccine, onNavigate }) {
+function Overview({ data, weights, latestWeight, weightChange, months, currentMonth, expenseChange, nextVaccine, nextCare, onNavigate }) {
   const pantry = data.pantry || emptyData.pantry;
   return <>
     <section className="metric-grid">
@@ -111,7 +116,7 @@ function Overview({ data, weights, latestWeight, weightChange, months, currentMo
       <Metric icon={Syringe} tone="blue" label="下次疫苗" value={nextVaccine ? formatDate(nextVaccine.date, true) : '暂无计划'} detail={nextVaccine?.name || '疫苗计划'}/>
     </section>
 
-    <section className="attention-grid">
+    <section className="attention-grid overview-attention">
       <div className="section-card attention-card">
         <SectionTitle eyebrow="需要关注" title="用品补货" action="查看库存" onClick={() => onNavigate('pantry')}/>
         {pantry.items?.length ? <div className="attention-list">{pantry.items.slice(0, 3).map((item) => <div className="attention-row" key={item.name}><span className="item-icon"><PackageCheck size={16}/></span><div><strong>{item.name}</strong><span>{item.status || '需要关注'}</span></div><b>{item.stock} {item.unit}</b></div>)}</div> : <Empty text="当前没有需要补货的用品"/>}
@@ -119,6 +124,10 @@ function Overview({ data, weights, latestWeight, weightChange, months, currentMo
       <div className="section-card next-card">
         <SectionTitle eyebrow="近期计划" title="下一项疫苗" action="健康详情" onClick={() => onNavigate('growth')}/>
         {nextVaccine ? <div className="next-vaccine"><div className="date-block"><strong>{new Date(nextVaccine.date + 'T00:00:00').getDate()}</strong><span>{new Date(nextVaccine.date + 'T00:00:00').toLocaleDateString('zh-CN', { month: 'short' })}</span></div><div><strong>{nextVaccine.name}</strong><span>建议接种日期 {formatDate(nextVaccine.date)}</span></div></div> : <Empty text="暂无疫苗计划"/>}
+      </div>
+      <div className="section-card care-card">
+        <SectionTitle eyebrow="儿童保健" title="下一次儿保" action="完整计划" onClick={() => onNavigate('growth')}/>
+        {nextCare ? <div className="next-vaccine"><div className="date-block"><strong>{new Date(nextCare.date + 'T00:00:00').getDate()}</strong><span>{new Date(nextCare.date + 'T00:00:00').toLocaleDateString('zh-CN', { month: 'short' })}</span></div><div><strong>{nextCare.label}</strong><span>{data.care?.provider || '儿童保健'} · {nextCare.weekday || formatDate(nextCare.date)}</span></div></div> : <Empty text="暂无儿保计划"/>}
       </div>
     </section>
 
@@ -134,7 +143,7 @@ function Overview({ data, weights, latestWeight, weightChange, months, currentMo
   </>;
 }
 
-function GrowthView({ weights, vaccines, latestWeight, weightChange }) {
+function GrowthView({ weights, vaccines, care, latestWeight, weightChange }) {
   return <div className="detail-layout">
     <section className="section-card detail-main">
       <SectionTitle eyebrow="成长趋势" title="体重记录"/>
@@ -148,13 +157,26 @@ function GrowthView({ weights, vaccines, latestWeight, weightChange }) {
         })}
       </div>
     </section>
-    <section className="section-card detail-side">
-      <SectionTitle eyebrow="接种安排" title="近期疫苗"/>
-      <div className="timeline">{vaccines.slice(0, 8).map((item, index) => <div className="timeline-item" key={item.name + item.date}><i className={index === 0 ? 'current' : ''}/><div><span>{formatDate(item.date)}</span><strong>{item.name}</strong></div></div>)}</div>
-    </section>
+    <div className="detail-stack">
+      <section className="section-card detail-side">
+        <SectionTitle eyebrow="接种安排" title="近期疫苗"/>
+        <div className="timeline">{vaccines.slice(0, 8).map((item, index) => <div className="timeline-item" key={item.name + item.date}><i className={index === 0 ? 'current' : ''}/><div><span>{formatDate(item.date)}</span><strong>{item.name}</strong></div></div>)}</div>
+      </section>
+      <section className="section-card detail-side">
+        <SectionTitle eyebrow={care?.provider || '儿童保健'} title="儿保计划"/>
+        <CareTimeline care={care}/>
+      </section>
+    </div>
   </div>;
 }
 
+function CareTimeline({ care }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const items = care?.milestones || [];
+  const nextIndex = items.findIndex((item) => item.date >= today);
+  if (!items.length) return <Empty text="暂无儿保计划"/>;
+  return <div className="timeline care-timeline">{items.map((item, index) => <div className="timeline-item" key={item.id || item.date}><i className={index === nextIndex ? 'current' : index < nextIndex || nextIndex < 0 ? 'done' : ''}/><div><span>{formatDate(item.date)}{item.weekday ? ' · ' + item.weekday : ''}</span><strong>{item.label}</strong></div></div>)}</div>;
+}
 function LedgerView({ months, transactions, currentMonth, expenseChange }) {
   return <>
     <section className="metric-grid compact">

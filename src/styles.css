@@ -80,6 +80,7 @@ button:focus-visible{outline:3px solid rgba(47,125,115,.24);outline-offset:2px}
 .delta.neutral{color:#a4abb1}
 .delta em{font-style:normal;color:#9ca4ab;font-weight:500;margin-left:3px}
 .attention-grid,.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.overview-attention{grid-template-columns:repeat(3,minmax(0,1fr))}
 .section-card{border-radius:14px;padding:20px;min-width:0}
 .section-title{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px}
 .section-title span{display:block;color:var(--teal);font-size:8px;font-weight:750;letter-spacing:.14em;text-transform:uppercase;margin-bottom:5px}
@@ -123,6 +124,11 @@ button:focus-visible{outline:3px solid rgba(47,125,115,.24);outline-offset:2px}
 .detail-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,.75fr);gap:14px}
 .ledger-layout{grid-template-columns:minmax(0,1.25fr) minmax(320px,.8fr)}
 .detail-main,.detail-side{min-height:420px}
+.detail-stack{display:grid;gap:14px;align-content:start}
+.detail-stack .detail-side{min-height:auto}
+.care-card .date-block{background:var(--teal-soft);color:var(--teal)}
+.timeline-item i.done{border-color:#a8cbc3;background:#dcece8}
+.care-timeline{max-height:430px;overflow:auto;padding-right:4px}
 .detail-summary{display:flex;align-items:flex-end;justify-content:space-between;padding:0 0 22px}
 .detail-summary>div>span{display:block;font-size:9px;color:var(--muted);margin-bottom:5px}
 .detail-summary>div>strong{font-size:27px;letter-spacing:-.04em}
@@ -168,6 +174,8 @@ button:focus-visible{outline:3px solid rgba(47,125,115,.24);outline-offset:2px}
   .metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .metric-grid.compact.three{grid-template-columns:repeat(3,minmax(0,1fr))}
   .chart-grid{grid-template-columns:1fr}
+  .overview-attention{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .overview-attention>.care-card{grid-column:1/-1}
   .detail-layout,.ledger-layout{grid-template-columns:1fr}
   .detail-side{min-height:auto}
 }
@@ -191,6 +199,8 @@ button:focus-visible{outline:3px solid rgba(47,125,115,.24);outline-offset:2px}
   .metric-foot{display:block}
   .metric-foot .delta{margin-top:5px}
   .attention-grid,.chart-grid{grid-template-columns:1fr;gap:10px;margin-bottom:10px}
+  .overview-attention{grid-template-columns:1fr}
+  .overview-attention>.care-card{grid-column:auto}
   .section-card{padding:16px;border-radius:12px}
   .section-title{margin-bottom:15px}
   .line-chart{height:205px;overflow-x:auto}
