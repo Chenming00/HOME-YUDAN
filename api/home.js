@@ -34,12 +34,14 @@ async function readMonthlySeries() {
       month: `${targets[index].month}月`,
       income: 0,
       expense: Number(result.data?.totalExpense || 0),
+      transactionCount: Number(result.data?.transactionCount || 0),
+      categoryBreakdown: arrayOf(result.data?.categoryBreakdown),
     })),
   };
 }
 
 const transactionsOf = (value) => arrayOf(value, ['items', 'transactions', 'records']).map((item) => ({
-  date: item.date || item.transaction_date || item.created_at,
+  date: item.date || item.transaction_date || item.transaction_time || item.created_at,
   title: item.title || item.description || item.note || '家庭支出',
   category: item.category || item.category_name || '未分类',
   amount: Number(item.amount || 0),
@@ -79,16 +81,23 @@ function pantryOf(value, products, attention) {
   const all = arrayOf(products, ['products', 'items']);
   const alerts = arrayOf(attention, ['batches', 'items']);
   const source = arrayOf(value, ['replenishList', 'favorites', 'searchItems', 'attention', 'restock', 'items', 'products']);
-  const items = source.map((item) => ({
-    name: item.name || item.product_name || item.product?.name,
-    stock: Number(item.stock ?? item.current_stock ?? item.quantity ?? item.total_quantity ?? 0),
-    unit: item.unit || item.product?.unit || '',
-    status: Number(item.current_stock ?? item.stock ?? 0) <= Number(item.min_stock ?? 0) ? '库存偏低' : (item.status_text || item.alert || item.status || '正常'),
-  })).filter((item) => item.name);
+  const items = source.map((item) => {
+    const stock = Number(item.stock ?? item.current_stock ?? item.quantity ?? item.total_quantity ?? 0);
+    const minimum = Number(item.min_stock ?? item.minimum_stock ?? item.safety_stock ?? 0);
+    return {
+      name: item.name || item.product_name || item.product?.name,
+      stock,
+      minimum,
+      suggested: Number(item.suggest ?? item.suggested_quantity ?? Math.max(0, minimum - stock)),
+      unit: item.unit || item.product?.unit || '',
+      status: stock <= 0 ? '已缺货' : stock <= minimum ? '库存偏低' : (item.status_text || item.alert || item.status || '正常'),
+    };
+  }).filter((item) => item.name);
   const stats = value || {};
   return {
     total: Number(stats.productCount ?? stats.total_products ?? stats.active_products ?? all.length ?? items.length),
     low: Number(stats.lowStockCount ?? stats.low_stock ?? stats.low_stock_count ?? 0),
+    outOfStock: Number(stats.outOfStockCount ?? stats.out_of_stock ?? stats.out_of_stock_count ?? 0),
     nearExpiry: Number(stats.nearExpiryCount ?? stats.near_expiry ?? stats.near_expiry_count ?? alerts.length ?? 0),
     items,
   };

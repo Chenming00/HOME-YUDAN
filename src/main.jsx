@@ -30,7 +30,7 @@ const emptyData = {
   growth: { weights: [] },
   vaccines: [],
   care: { provider: '', birthday: '', milestones: [] },
-  pantry: { total: 0, low: 0, nearExpiry: 0, items: [] },
+  pantry: { total: 0, low: 0, outOfStock: 0, nearExpiry: 0, items: [] },
 };
 
 const navigation = [
@@ -65,7 +65,7 @@ function formatDate(value, compact = false) {
   if (!value) return '--';
   const date = new Date(String(value).slice(0, 10) + 'T00:00:00');
   if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleDateString('zh-CN', compact ? { month: 'short', day: 'numeric' } : { year: 'numeric', month: 'long', day: 'numeric' });
+  return date.toLocaleDateString('zh-CN', compact ? { month: 'short', day: 'numeric' } : { month: 'long', day: 'numeric' });
 }
 
 function shortDate(value) {
@@ -74,10 +74,6 @@ function shortDate(value) {
 
 function isCompletedStatus(status) {
   return /(已完成|已接种|completed|done)/i.test(String(status || ''));
-}
-
-function getToneClass(tone) {
-  return tone;
 }
 
 /* ---------- Main App ---------- */
@@ -91,7 +87,6 @@ function App() {
   const [topbarHidden, setTopbarHidden] = useState(false);
   const [topbarScrolled, setTopbarScrolled] = useState(false);
   const lastScrollY = useRef(0);
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -302,14 +297,17 @@ function LoadingView({ view }) {
           <div className="metric-grid">
             {[1, 2, 3, 4].map((i) => <MetricSkeleton key={i} />)}
           </div>
-          <div className="overview-attention attention-grid">
-            {[1, 2, 3].map((i) => <SectionSkeleton key={i} />)}
+          <div className="editorial-layout loading-editorial">
+            <div className="editorial-primary">
+              <SectionSkeleton tall />
+              <SectionSkeleton tall />
+              <SectionSkeleton />
+            </div>
+            <div className="editorial-aside">
+              <SectionSkeleton />
+              <SectionSkeleton />
+            </div>
           </div>
-          <div className="chart-grid">
-            <SectionSkeleton tall />
-            <SectionSkeleton tall />
-          </div>
-          <SectionSkeleton />
         </>
       )}
       {view === 'growth' && (
@@ -369,88 +367,95 @@ function Overview({ data, weights, latestWeight, weightChange, months, currentMo
 
   return (
     <>
-      <HeroCard babyDays={babyDays} birthday={birthday} nextEvent={nextEvent} today={today} />
+      <HeroCard babyDays={babyDays} birthday={birthday} nextEvent={nextEvent} today={today} latestWeight={latestWeight} />
 
-      <section className="metric-grid">
+      <section className="metric-grid editorial-metrics" aria-label="家庭关键数据">
         <Metric icon={Baby} tone="teal" label="最新体重" value={latestWeight ? formatWeight(latestWeight.weight) : '暂无记录'} unit={latestWeight ? 'kg' : ''} detail={latestWeight ? formatDate(latestWeight.date) : '成长数据'} delta={weightChange} deltaUnit=" kg" deltaType="weight" />
-        <Metric icon={CircleDollarSign} tone="red" label="本月支出" value={formatCurrency(currentMonth?.expense || 0)} detail="家庭账本" delta={expenseChange} currencyDelta deltaType="expense" />
-        <Metric icon={ShoppingBag} tone="amber" label="待补货" value={String(pantry.low || 0)} unit="项" detail={(pantry.total || 0) + ' 种启用商品'} />
         <Metric icon={Syringe} tone="blue" label="下次疫苗" value={nextVaccine ? formatDate(nextVaccine.date, true) : '暂无计划'} detail={nextVaccine?.name || '疫苗计划'} />
+        <Metric icon={CircleDollarSign} tone="red" label="本月支出" value={formatCurrency(currentMonth?.expense || 0)} detail={`${currentMonth?.transactionCount || 0} 笔家庭账目`} delta={expenseChange} currencyDelta deltaType="expense" />
+        <Metric icon={ShoppingBag} tone="amber" label="用品提醒" value={String(pantry.low || 0)} unit="项" detail={`${pantry.outOfStock || 0} 项已经缺货`} />
       </section>
 
-      <section className="attention-grid overview-attention">
-        <div className="section-card attention-card">
-          <SectionTitle eyebrow="需要关注" title="用品补货" action="查看库存" onClick={() => onNavigate('pantry')} />
-          {pantry.items?.length ? (
-            <div className="attention-list">
-              {pantry.items.slice(0, 3).map((item) => (
-                <div className="attention-row" key={item.name}>
-                  <span className="item-icon"><PackageCheck size={16} /></span>
-                  <div>
-                    <strong>{item.name}</strong>
-                    <span>{item.status || '需要关注'}</span>
-                    <div className="stock-bar"><i style={{ width: Math.min(100, Math.max(5, (item.stock / (item.threshold || 10)) * 100)) + '%' }} /></div>
-                  </div>
-                  <b>{item.stock} {item.unit}</b>
-                </div>
-              ))}
+      <section className="editorial-layout">
+        <div className="editorial-primary">
+          <section className="section-card growth-feature">
+            <SectionTitle eyebrow="成长记录" title="体重变化" action="查看全部" onClick={() => onNavigate('growth')} />
+            <WeightChart weights={weights} large />
+          </section>
+
+          <section className="section-card ledger-feature">
+            <SectionTitle eyebrow="家庭账本" title="近六个月支出" action="账本详情" onClick={() => onNavigate('ledger')} />
+            <ExpenseChart months={months} />
+          </section>
+
+          <section className="section-card transaction-card">
+            <SectionTitle eyebrow="最近发生" title="家庭账目" action="查看全部" onClick={() => onNavigate('ledger')} />
+            <TransactionList items={data.ledger?.transactions?.slice(0, 5) || []} />
+          </section>
+        </div>
+
+        <aside className="editorial-aside">
+          <section className="agenda-panel">
+            <SectionTitle eyebrow="接下来" title="疫苗与儿保" action="完整计划" onClick={() => onNavigate('growth')} />
+            <div className="agenda-list">
+              {nextVaccine && <NextEventCard event={nextVaccine} type="vaccine" subtitle="下一项疫苗" today={today} />}
+              {nextCare && <NextEventCard event={nextCare} type="care" subtitle="下一次儿保" today={today} />}
+              {!nextVaccine && !nextCare && <Empty text="暂无近期安排" />}
             </div>
-          ) : (
-            <Empty text="当前没有需要补货的用品" />
-          )}
-        </div>
+          </section>
 
-        <div className="section-card next-card">
-          <SectionTitle eyebrow="近期计划" title="下一项疫苗" action="健康详情" onClick={() => onNavigate('growth')} />
-          {nextVaccine ? <NextEventCard event={nextVaccine} type="vaccine" subtitle={`建议接种日期 ${formatDate(nextVaccine.date)}`} today={today} /> : <Empty text="暂无疫苗计划" />}
-        </div>
-
-        <div className="section-card care-card">
-          <SectionTitle eyebrow="儿童保健" title="下一次儿保" action="完整计划" onClick={() => onNavigate('growth')} />
-          {nextCare ? <NextEventCard event={nextCare} type="care" subtitle={`${data.care?.provider || '儿童保健'} · ${nextCare.weekday || formatDate(nextCare.date)}`} today={today} /> : <Empty text="暂无儿保计划" />}
-        </div>
-      </section>
-
-      <section className="chart-grid">
-        <div className="section-card">
-          <SectionTitle eyebrow="成长趋势" title="最近体重" action="全部记录" onClick={() => onNavigate('growth')} />
-          <WeightChart weights={weights} />
-        </div>
-        <div className="section-card">
-          <SectionTitle eyebrow="家庭账本" title="近六个月支出" action="账本详情" onClick={() => onNavigate('ledger')} />
-          <ExpenseChart months={months} />
-        </div>
-      </section>
-
-      <section className="section-card">
-        <SectionTitle eyebrow="最新动态" title="最近账目" action="查看账本" onClick={() => onNavigate('ledger')} />
-        <TransactionList items={data.ledger?.transactions?.slice(0, 5) || []} />
+          <section className="restock-panel">
+            <SectionTitle eyebrow="需要准备" title="用品补货" action="查看库存" onClick={() => onNavigate('pantry')} />
+            {pantry.items?.length ? (
+              <div className="attention-list">
+                {pantry.items.slice(0, 5).map((item) => (
+                  <div className="attention-row" key={item.name}>
+                    <span className="item-icon"><PackageCheck size={16} /></span>
+                    <div>
+                      <strong>{item.name}</strong>
+                      <span>{item.status || '需要关注'} · 安全线 {item.minimum ?? '--'} {item.unit}</span>
+                    </div>
+                    <b>{item.suggested > 0 ? `补 ${item.suggested}` : `剩 ${item.stock}`} {item.unit}</b>
+                  </div>
+                ))}
+              </div>
+            ) : <Empty text="当前没有需要补货的用品" />}
+          </section>
+        </aside>
       </section>
     </>
   );
 }
 
-function HeroCard({ babyDays, birthday, nextEvent, today }) {
+function HeroCard({ babyDays, birthday, nextEvent, today, latestWeight }) {
   const isKnownBirthday = birthday !== BABY_BIRTHDAY_FALLBACK;
   const ageText = isKnownBirthday && babyDays >= 0
-    ? `鱼蛋出生第 ${babyDays} 天`
-    : '欢迎来到鱼蛋家庭数据中心';
-
+    ? `来到世界的第 ${babyDays} 天`
+    : '鱼蛋的成长日记';
   const daysToEvent = nextEvent ? daysBetween(today, nextEvent.date) : null;
+  const todayLabel = new Date(today + 'T00:00:00').toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
 
   return (
-    <section className="section-card hero-card">
+    <section className="hero-card">
+      <div className="hero-date">
+        <span>{todayLabel}</span>
+        <i />
+        <span>家庭成长手册</span>
+      </div>
       <div className="hero-content">
         <div className="hero-greeting">
+          <p className="hero-overline">YUDAN'S JOURNAL</p>
           <h2>{ageText}</h2>
-          <p>只读聚合 · 数据来自小账本、成长记录与库存表</p>
+          <p className="hero-copy">记录每一次成长，也照看生活里那些需要被记住的小事。</p>
+          {latestWeight && <span className="hero-weight">最近体重 {formatWeight(latestWeight.weight)} kg · {formatDate(latestWeight.date)}</span>}
         </div>
         {nextEvent && daysToEvent !== null && (
           <div className="hero-countdown">
-            <Clock size={20} />
+            <Clock size={18} />
             <div>
-              <strong>{daysToEvent <= 0 ? '就在今天' : `还有 ${daysToEvent} 天`}</strong>
-              <span>下次{nextEvent.type === 'vaccine' ? '疫苗' : '儿保'}：{nextEvent.label}</span>
+              <span>下一项安排</span>
+              <strong>{nextEvent.label}</strong>
+              <em>{daysToEvent <= 0 ? '就在今天' : `${daysToEvent} 天后`}</em>
             </div>
           </div>
         )}
@@ -459,11 +464,11 @@ function HeroCard({ babyDays, birthday, nextEvent, today }) {
   );
 }
 
-function NextEventCard({ event, type, subtitle, today }) {
+function NextEventCard({ event, type, subtitle, today, compact = false }) {
   const date = new Date(event.date + 'T00:00:00');
   const daysLeft = daysBetween(today, event.date);
   return (
-    <div className="next-event">
+    <div className={`next-event ${compact ? 'compact' : ''}`}>
       <div className={`date-block ${type === 'care' ? 'teal' : ''}`}>
         <strong>{date.getDate()}</strong>
         <span>{date.toLocaleDateString('zh-CN', { month: 'short' })}</span>
@@ -539,8 +544,9 @@ function CarePlanTimeline({ items }) {
   return (
     <>
       <div className="timeline care-timeline">
-        {visibleItems.map((item, index) => {
-          const completed = Boolean(item.actualDate) || isCompletedStatus(item.status) || index < nextIndex || nextIndex < 0;
+        {visibleItems.map((item) => {
+          const originalIndex = items.indexOf(item);
+          const completed = Boolean(item.actualDate) || isCompletedStatus(item.status) || originalIndex < nextIndex || nextIndex < 0;
           const markerClass = completed ? 'done' : item === items[nextIndex] ? 'current' : '';
           return (
             <div className="timeline-item" key={[item.recordType, item.planId || item.id || item.name || item.label, item.date, item.originalIndex].join('-')}>
@@ -571,8 +577,9 @@ function CarePlanTimeline({ items }) {
 function LedgerView({ months, transactions, currentMonth, expenseChange }) {
   return (
     <>
-      <section className="metric-grid compact">
+      <section className="metric-grid compact three">
         <Metric icon={CircleDollarSign} tone="red" label="本月支出" value={formatCurrency(currentMonth?.expense || 0)} detail="当前自然月" delta={expenseChange} currencyDelta deltaType="expense" />
+        <Metric icon={WalletCards} tone="teal" label="本月笔数" value={String(currentMonth?.transactionCount || 0)} unit="笔" detail="交易记录" />
         <Metric icon={CalendarDays} tone="blue" label="近六个月" value={formatCurrency(months.reduce((sum, item) => sum + Number(item.expense || 0), 0))} detail="累计支出" />
       </section>
       <div className="detail-layout ledger-layout">
@@ -594,10 +601,11 @@ function LedgerView({ months, transactions, currentMonth, expenseChange }) {
 function PantryView({ pantry }) {
   return (
     <>
-      <section className="metric-grid compact three">
+      <section className="metric-grid">
         <Metric icon={PackageCheck} tone="teal" label="启用商品" value={String(pantry.total || 0)} unit="种" detail="用品总数" />
-        <Metric icon={ShoppingBag} tone="amber" label="待补货" value={String(pantry.low || 0)} unit="项" detail="低库存与缺货" />
-        <Metric icon={CalendarDays} tone="red" label="近期临期" value={String(pantry.nearExpiry || 0)} unit="项" detail="未来 30 天" />
+        <Metric icon={AlertCircle} tone="red" label="已缺货" value={String(pantry.outOfStock || 0)} unit="项" detail="需要优先购买" />
+        <Metric icon={ShoppingBag} tone="amber" label="待补货" value={String(pantry.low || 0)} unit="项" detail="达到安全线" />
+        <Metric icon={CalendarDays} tone="blue" label="近期临期" value={String(pantry.nearExpiry || 0)} unit="项" detail="未来 30 天" />
       </section>
       <section className="section-card">
         <SectionTitle eyebrow="库存关注" title="补货清单" />
@@ -753,12 +761,15 @@ function WeightChart({ weights, large }) {
 function ExpenseChart({ months, large }) {
   if (!months.length) return <Empty text="暂无支出记录" />;
   const max = Math.max(...months.map((item) => Number(item.expense || 0)), 1);
-  const currentMonthStr = new Date().toISOString().slice(0, 7);
+  const currentMonthLabels = [
+    new Date().toISOString().slice(0, 7),
+    `${new Date().getMonth() + 1}月`,
+  ];
 
   return (
     <div className={`expense-chart ${large ? 'large' : ''}`}>
       {months.map((item) => {
-        const isCurrent = item.month === currentMonthStr;
+        const isCurrent = currentMonthLabels.includes(item.month);
         return (
           <div className={`expense-column ${isCurrent ? 'current' : ''}`} key={item.month}>
             <div className="expense-value">{item.expense ? compactCurrency(item.expense) : '¥0'}</div>
@@ -793,6 +804,14 @@ function TransactionList({ items }) {
 
 function SourceStatus({ sources }) {
   if (!sources.length) return null;
+  const offline = sources.filter((source) => !source.ok);
+  if (!offline.length) {
+    return (
+      <div className="source-strip source-summary">
+        <span className="online"><i />{sources.length} 个数据源正常</span>
+      </div>
+    );
+  }
   return (
     <div className="source-strip">
       {sources.map((source) => (
