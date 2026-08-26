@@ -1,9 +1,26 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  AlertCircle, ArrowDownRight, ArrowUpRight, Baby, CalendarDays, CheckCircle2,
-  CircleDollarSign, HeartPulse, LayoutDashboard, PackageCheck, RefreshCw,
-  ShieldCheck, ShoppingBag, Syringe, TrendingUp, WalletCards,
+  AlertCircle,
+  ArrowDownRight,
+  ArrowUp,
+  ArrowUpRight,
+  Baby,
+  CalendarDays,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  CircleDollarSign,
+  Clock,
+  HeartPulse,
+  LayoutDashboard,
+  PackageCheck,
+  RefreshCw,
+  ShieldCheck,
+  ShoppingBag,
+  Sparkles,
+  Syringe,
+  WalletCards,
 } from 'lucide-react';
 import './styles.css';
 
@@ -23,11 +40,58 @@ const navigation = [
   { id: 'pantry', label: '用品库存', short: '库存', icon: PackageCheck },
 ];
 
+const BABY_BIRTHDAY_FALLBACK = '2026-08-30';
+
+/* ---------- Helpers ---------- */
+
+function daysBetween(a, b) {
+  const ms = new Date(b + 'T00:00:00').getTime() - new Date(a + 'T00:00:00').getTime();
+  return Math.floor(ms / 86400000);
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', minimumFractionDigits: 2 }).format(Number(value || 0));
+}
+
+function compactCurrency(value) {
+  return '¥' + new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(value || 0));
+}
+
+function formatWeight(value) {
+  return Number(value).toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+function formatDate(value, compact = false) {
+  if (!value) return '--';
+  const date = new Date(String(value).slice(0, 10) + 'T00:00:00');
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString('zh-CN', compact ? { month: 'short', day: 'numeric' } : { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function shortDate(value) {
+  return String(value || '').slice(5).replace('-', '/');
+}
+
+function isCompletedStatus(status) {
+  return /(已完成|已接种|completed|done)/i.test(String(status || ''));
+}
+
+function getToneClass(tone) {
+  return tone;
+}
+
+/* ---------- Main App ---------- */
+
 function App() {
   const [data, setData] = useState(emptyData);
   const [view, setView] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const [topbarHidden, setTopbarHidden] = useState(false);
+  const [topbarScrolled, setTopbarScrolled] = useState(false);
+  const lastScrollY = useRef(0);
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -45,6 +109,20 @@ function App() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY;
+      setTopbarScrolled(y > 8);
+      if (window.innerWidth < 768) {
+        setTopbarHidden(y > 120 && y > lastScrollY.current);
+      }
+      setShowBackToTop(y > 400);
+      lastScrollY.current = y;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   const weights = data.growth?.weights || [];
   const latestWeight = weights[0];
   const previousWeight = weights[1];
@@ -53,14 +131,28 @@ function App() {
   const currentMonth = months.at(-1);
   const previousMonth = months.at(-2);
   const expenseChange = currentMonth && previousMonth ? currentMonth.expense - previousMonth.expense : null;
+
   const nextVaccine = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     return (data.vaccines || []).find((item) => item.date >= today) || data.vaccines?.[0];
   }, [data.vaccines]);
+
   const nextCare = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     return (data.care?.milestones || []).find((item) => item.date >= today) || data.care?.milestones?.at(-1);
   }, [data.care]);
+
+  const nextEvent = useMemo(() => {
+    const candidates = [];
+    if (nextVaccine) candidates.push({ ...nextVaccine, type: 'vaccine', label: nextVaccine.name });
+    if (nextCare) candidates.push({ ...nextCare, type: 'care', label: nextCare.label });
+    const today = new Date().toISOString().slice(0, 10);
+    return candidates
+      .filter((item) => item.date)
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+      .find((item) => item.date >= today) || candidates[0];
+  }, [nextVaccine, nextCare]);
+
   const carePlan = useMemo(() => {
     const vaccines = (data.vaccines || []).map((item) => ({
       ...item,
@@ -72,239 +164,677 @@ function App() {
       recordType: 'care',
       source: item.source || '卓正儿保',
     }));
-
     return [...vaccines, ...careMilestones]
       .map((item, originalIndex) => ({ ...item, originalIndex }))
       .filter((item) => item.date)
       .sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.originalIndex - b.originalIndex);
   }, [data.vaccines, data.care?.milestones]);
+
   const updatedAt = data.meta?.updatedAt
     ? new Date(data.meta.updatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     : '--:--';
+
+  const birthday = data.care?.birthday || BABY_BIRTHDAY_FALLBACK;
+  const babyDays = daysBetween(birthday, new Date().toISOString().slice(0, 10));
 
   const selectView = (id) => {
     setView(id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  return <div className="shell">
-    <aside className="sidebar">
-      <div className="identity"><div className="identity-mark">Y</div><div><strong>鱼蛋家庭</strong><span>生活数据中心</span></div></div>
-      <nav className="desktop-nav">{navigation.map((item) => <NavButton key={item.id} item={item} active={view === item.id} onClick={() => selectView(item.id)}/>)}</nav>
-      <div className="privacy"><ShieldCheck size={17}/><div><strong>全站只读</strong><span>不会修改源数据</span></div></div>
-    </aside>
-
-    <main className="workspace">
-      <header className="topbar">
-        <div><p className="kicker">YUDAN HOME</p><h1>{navigation.find((item) => item.id === view)?.label}</h1></div>
-        <div className="topbar-actions">
-          <div className="sync-state"><span className={failed ? 'status-dot error' : 'status-dot'}/><span>{failed ? '同步失败' : '数据已同步'} · {updatedAt}</span></div>
-          <button className="refresh-button" onClick={refresh} disabled={loading} aria-label="刷新数据"><RefreshCw size={17} className={loading ? 'spin' : ''}/><span>刷新</span></button>
+  return (
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="identity">
+          <div className="identity-mark">Y</div>
+          <div>
+            <strong>鱼蛋家庭</strong>
+            <span>生活数据中心</span>
+          </div>
         </div>
-      </header>
+        <nav className="desktop-nav">
+          {navigation.map((item) => (
+            <NavButton key={item.id} item={item} active={view === item.id} onClick={() => selectView(item.id)} />
+          ))}
+        </nav>
+        <div className="privacy">
+          <ShieldCheck size={18} />
+          <div>
+            <strong>全站只读</strong>
+            <span>不会修改源数据</span>
+          </div>
+        </div>
+      </aside>
 
-      <div className="page">
-        {failed && <div className="notice error"><AlertCircle size={17}/><span>暂时无法读取数据，请稍后刷新。页面不会使用演示数据代替真实记录。</span></div>}
-        {!failed && data.meta?.mode !== 'live' && data.meta?.mode !== 'loading' && <div className="notice"><AlertCircle size={17}/><span>部分数据源暂未连接，未连接的项目显示为空。</span></div>}
-        <SourceStatus sources={data.meta?.sources || []}/>
+      <main className="workspace">
+        <header className={`topbar ${topbarScrolled ? 'scrolled' : ''} ${topbarHidden ? 'hidden-mobile' : ''}`}>
+          <div>
+            <p className="kicker">YUDAN HOME</p>
+            <h1>{navigation.find((item) => item.id === view)?.label}</h1>
+          </div>
+          <div className="topbar-actions">
+            <div className="sync-state">
+              <span className={failed ? 'status-dot error' : 'status-dot'} />
+              <span>{failed ? '同步失败' : '数据已同步'} · {updatedAt}</span>
+            </div>
+            <button className="refresh-button" onClick={refresh} disabled={loading} aria-label="刷新数据">
+              <RefreshCw size={17} className={loading ? 'spin' : ''} />
+              <span>刷新</span>
+            </button>
+          </div>
+        </header>
 
-        {view === 'overview' && <Overview
-          data={data} weights={weights} latestWeight={latestWeight} weightChange={weightChange}
-          months={months} currentMonth={currentMonth} expenseChange={expenseChange}
-          nextVaccine={nextVaccine} nextCare={nextCare} onNavigate={selectView}
-        />}
-        {view === 'growth' && <GrowthView weights={weights} carePlan={carePlan} latestWeight={latestWeight} weightChange={weightChange}/>}
-        {view === 'ledger' && <LedgerView months={months} transactions={data.ledger?.transactions || []} currentMonth={currentMonth} expenseChange={expenseChange}/>}
-        {view === 'pantry' && <PantryView pantry={data.pantry || emptyData.pantry}/>}
-      </div>
-    </main>
+        <div className="page">
+          {failed && (
+            <div className="notice error">
+              <AlertCircle size={17} />
+              <span>暂时无法读取数据，请稍后刷新。页面不会使用演示数据代替真实记录。</span>
+            </div>
+          )}
+          {!failed && data.meta?.mode !== 'live' && data.meta?.mode !== 'loading' && (
+            <div className="notice">
+              <AlertCircle size={17} />
+              <span>部分数据源暂未连接，未连接的项目显示为空。</span>
+            </div>
+          )}
+          <SourceStatus sources={data.meta?.sources || []} />
 
-    <nav className="mobile-nav">{navigation.map((item) => <NavButton key={item.id} item={item} active={view === item.id} onClick={() => selectView(item.id)} mobile/>)}</nav>
-  </div>;
+          {loading && data.meta?.mode === 'loading' ? (
+            <LoadingView view={view} />
+          ) : (
+            <div className="page-transition" key={view}>
+              {view === 'overview' && (
+                <Overview
+                  data={data}
+                  weights={weights}
+                  latestWeight={latestWeight}
+                  weightChange={weightChange}
+                  months={months}
+                  currentMonth={currentMonth}
+                  expenseChange={expenseChange}
+                  nextVaccine={nextVaccine}
+                  nextCare={nextCare}
+                  nextEvent={nextEvent}
+                  babyDays={babyDays}
+                  birthday={birthday}
+                  onNavigate={selectView}
+                />
+              )}
+              {view === 'growth' && (
+                <GrowthView weights={weights} carePlan={carePlan} latestWeight={latestWeight} weightChange={weightChange} />
+              )}
+              {view === 'ledger' && (
+                <LedgerView months={months} transactions={data.ledger?.transactions || []} currentMonth={currentMonth} expenseChange={expenseChange} />
+              )}
+              {view === 'pantry' && <PantryView pantry={data.pantry || emptyData.pantry} />}
+            </div>
+          )}
+        </div>
+      </main>
+
+      <nav className="mobile-nav">
+        {navigation.map((item) => (
+          <NavButton key={item.id} item={item} active={view === item.id} onClick={() => selectView(item.id)} mobile />
+        ))}
+      </nav>
+
+      <button
+        className={`back-to-top ${showBackToTop ? 'visible' : ''}`}
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        aria-label="回到顶部"
+      >
+        <ArrowUp size={20} />
+      </button>
+    </div>
+  );
 }
 
-function Overview({ data, weights, latestWeight, weightChange, months, currentMonth, expenseChange, nextVaccine, nextCare, onNavigate }) {
+/* ---------- Loading Skeleton View ---------- */
+
+function LoadingView({ view }) {
+  return (
+    <div className="page-transition">
+      {view === 'overview' && (
+        <>
+          <div className="hero-card section-card" style={{ opacity: 0.7 }}>
+            <div className="skeleton" style={{ height: 64, width: '60%' }} />
+          </div>
+          <div className="metric-grid">
+            {[1, 2, 3, 4].map((i) => <MetricSkeleton key={i} />)}
+          </div>
+          <div className="overview-attention attention-grid">
+            {[1, 2, 3].map((i) => <SectionSkeleton key={i} />)}
+          </div>
+          <div className="chart-grid">
+            <SectionSkeleton tall />
+            <SectionSkeleton tall />
+          </div>
+          <SectionSkeleton />
+        </>
+      )}
+      {view === 'growth' && (
+        <div className="detail-layout">
+          <SectionSkeleton tall />
+          <SectionSkeleton tall />
+        </div>
+      )}
+      {view === 'ledger' && (
+        <>
+          <div className="metric-grid compact">
+            <MetricSkeleton />
+            <MetricSkeleton />
+          </div>
+          <div className="detail-layout ledger-layout">
+            <SectionSkeleton tall />
+            <SectionSkeleton tall />
+          </div>
+        </>
+      )}
+      {view === 'pantry' && (
+        <>
+          <div className="metric-grid compact three">
+            {[1, 2, 3].map((i) => <MetricSkeleton key={i} />)}
+          </div>
+          <SectionSkeleton />
+        </>
+      )}
+    </div>
+  );
+}
+
+function MetricSkeleton() {
+  return (
+    <div className="metric-card metric-skeleton">
+      <div className="skeleton skeleton-icon" />
+      <div className="skeleton skeleton-label" />
+      <div className="skeleton skeleton-value" />
+    </div>
+  );
+}
+
+function SectionSkeleton({ tall }) {
+  return (
+    <div className="section-card" style={{ minHeight: tall ? 300 : 160 }}>
+      <div className="skeleton" style={{ height: 20, width: '40%', marginBottom: 20 }} />
+      <div className="skeleton" style={{ height: tall ? 200 : 60, width: '100%' }} />
+    </div>
+  );
+}
+
+/* ---------- Overview ---------- */
+
+function Overview({ data, weights, latestWeight, weightChange, months, currentMonth, expenseChange, nextVaccine, nextCare, nextEvent, babyDays, birthday, onNavigate }) {
   const pantry = data.pantry || emptyData.pantry;
-  return <>
-    <section className="metric-grid">
-      <Metric icon={Baby} tone="teal" label="最新体重" value={latestWeight ? formatWeight(latestWeight.weight) : '暂无记录'} unit={latestWeight ? 'kg' : ''} detail={latestWeight ? formatDate(latestWeight.date) : '成长数据'} delta={weightChange} deltaUnit=" kg"/>
-      <Metric icon={CircleDollarSign} tone="red" label="本月支出" value={formatCurrency(currentMonth?.expense || 0)} detail="家庭账本" delta={expenseChange} currencyDelta/>
-      <Metric icon={ShoppingBag} tone="amber" label="待补货" value={String(pantry.low || 0)} unit="项" detail={(pantry.total || 0) + ' 种启用商品'}/>
-      <Metric icon={Syringe} tone="blue" label="下次疫苗" value={nextVaccine ? formatDate(nextVaccine.date, true) : '暂无计划'} detail={nextVaccine?.name || '疫苗计划'}/>
-    </section>
+  const today = new Date().toISOString().slice(0, 10);
 
-    <section className="attention-grid overview-attention">
-      <div className="section-card attention-card">
-        <SectionTitle eyebrow="需要关注" title="用品补货" action="查看库存" onClick={() => onNavigate('pantry')}/>
-        {pantry.items?.length ? <div className="attention-list">{pantry.items.slice(0, 3).map((item) => <div className="attention-row" key={item.name}><span className="item-icon"><PackageCheck size={16}/></span><div><strong>{item.name}</strong><span>{item.status || '需要关注'}</span></div><b>{item.stock} {item.unit}</b></div>)}</div> : <Empty text="当前没有需要补货的用品"/>}
-      </div>
-      <div className="section-card next-card">
-        <SectionTitle eyebrow="近期计划" title="下一项疫苗" action="健康详情" onClick={() => onNavigate('growth')}/>
-        {nextVaccine ? <div className="next-vaccine"><div className="date-block"><strong>{new Date(nextVaccine.date + 'T00:00:00').getDate()}</strong><span>{new Date(nextVaccine.date + 'T00:00:00').toLocaleDateString('zh-CN', { month: 'short' })}</span></div><div><strong>{nextVaccine.name}</strong><span>建议接种日期 {formatDate(nextVaccine.date)}</span></div></div> : <Empty text="暂无疫苗计划"/>}
-      </div>
-      <div className="section-card care-card">
-        <SectionTitle eyebrow="儿童保健" title="下一次儿保" action="完整计划" onClick={() => onNavigate('growth')}/>
-        {nextCare ? <div className="next-vaccine"><div className="date-block"><strong>{new Date(nextCare.date + 'T00:00:00').getDate()}</strong><span>{new Date(nextCare.date + 'T00:00:00').toLocaleDateString('zh-CN', { month: 'short' })}</span></div><div><strong>{nextCare.label}</strong><span>{data.care?.provider || '儿童保健'} · {nextCare.weekday || formatDate(nextCare.date)}</span></div></div> : <Empty text="暂无儿保计划"/>}
-      </div>
-    </section>
+  return (
+    <>
+      <HeroCard babyDays={babyDays} birthday={birthday} nextEvent={nextEvent} today={today} />
 
-    <section className="chart-grid">
-      <div className="section-card"><SectionTitle eyebrow="成长趋势" title="最近体重" action="全部记录" onClick={() => onNavigate('growth')}/><WeightChart weights={weights}/></div>
-      <div className="section-card"><SectionTitle eyebrow="家庭账本" title="近六个月支出" action="账本详情" onClick={() => onNavigate('ledger')}/><ExpenseChart months={months}/></div>
-    </section>
+      <section className="metric-grid">
+        <Metric icon={Baby} tone="teal" label="最新体重" value={latestWeight ? formatWeight(latestWeight.weight) : '暂无记录'} unit={latestWeight ? 'kg' : ''} detail={latestWeight ? formatDate(latestWeight.date) : '成长数据'} delta={weightChange} deltaUnit=" kg" deltaType="weight" />
+        <Metric icon={CircleDollarSign} tone="red" label="本月支出" value={formatCurrency(currentMonth?.expense || 0)} detail="家庭账本" delta={expenseChange} currencyDelta deltaType="expense" />
+        <Metric icon={ShoppingBag} tone="amber" label="待补货" value={String(pantry.low || 0)} unit="项" detail={(pantry.total || 0) + ' 种启用商品'} />
+        <Metric icon={Syringe} tone="blue" label="下次疫苗" value={nextVaccine ? formatDate(nextVaccine.date, true) : '暂无计划'} detail={nextVaccine?.name || '疫苗计划'} />
+      </section>
 
-    <section className="section-card">
-      <SectionTitle eyebrow="最新动态" title="最近账目" action="查看账本" onClick={() => onNavigate('ledger')}/>
-      <TransactionList items={data.ledger?.transactions?.slice(0, 5) || []}/>
-    </section>
-  </>;
+      <section className="attention-grid overview-attention">
+        <div className="section-card attention-card">
+          <SectionTitle eyebrow="需要关注" title="用品补货" action="查看库存" onClick={() => onNavigate('pantry')} />
+          {pantry.items?.length ? (
+            <div className="attention-list">
+              {pantry.items.slice(0, 3).map((item) => (
+                <div className="attention-row" key={item.name}>
+                  <span className="item-icon"><PackageCheck size={16} /></span>
+                  <div>
+                    <strong>{item.name}</strong>
+                    <span>{item.status || '需要关注'}</span>
+                    <div className="stock-bar"><i style={{ width: Math.min(100, Math.max(5, (item.stock / (item.threshold || 10)) * 100)) + '%' }} /></div>
+                  </div>
+                  <b>{item.stock} {item.unit}</b>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Empty text="当前没有需要补货的用品" />
+          )}
+        </div>
+
+        <div className="section-card next-card">
+          <SectionTitle eyebrow="近期计划" title="下一项疫苗" action="健康详情" onClick={() => onNavigate('growth')} />
+          {nextVaccine ? <NextEventCard event={nextVaccine} type="vaccine" subtitle={`建议接种日期 ${formatDate(nextVaccine.date)}`} today={today} /> : <Empty text="暂无疫苗计划" />}
+        </div>
+
+        <div className="section-card care-card">
+          <SectionTitle eyebrow="儿童保健" title="下一次儿保" action="完整计划" onClick={() => onNavigate('growth')} />
+          {nextCare ? <NextEventCard event={nextCare} type="care" subtitle={`${data.care?.provider || '儿童保健'} · ${nextCare.weekday || formatDate(nextCare.date)}`} today={today} /> : <Empty text="暂无儿保计划" />}
+        </div>
+      </section>
+
+      <section className="chart-grid">
+        <div className="section-card">
+          <SectionTitle eyebrow="成长趋势" title="最近体重" action="全部记录" onClick={() => onNavigate('growth')} />
+          <WeightChart weights={weights} />
+        </div>
+        <div className="section-card">
+          <SectionTitle eyebrow="家庭账本" title="近六个月支出" action="账本详情" onClick={() => onNavigate('ledger')} />
+          <ExpenseChart months={months} />
+        </div>
+      </section>
+
+      <section className="section-card">
+        <SectionTitle eyebrow="最新动态" title="最近账目" action="查看账本" onClick={() => onNavigate('ledger')} />
+        <TransactionList items={data.ledger?.transactions?.slice(0, 5) || []} />
+      </section>
+    </>
+  );
 }
+
+function HeroCard({ babyDays, birthday, nextEvent, today }) {
+  const isKnownBirthday = birthday !== BABY_BIRTHDAY_FALLBACK;
+  const ageText = isKnownBirthday && babyDays >= 0
+    ? `鱼蛋出生第 ${babyDays} 天`
+    : '欢迎来到鱼蛋家庭数据中心';
+
+  const daysToEvent = nextEvent ? daysBetween(today, nextEvent.date) : null;
+
+  return (
+    <section className="section-card hero-card">
+      <div className="hero-content">
+        <div className="hero-greeting">
+          <h2>{ageText}</h2>
+          <p>只读聚合 · 数据来自小账本、成长记录与库存表</p>
+        </div>
+        {nextEvent && daysToEvent !== null && (
+          <div className="hero-countdown">
+            <Clock size={20} />
+            <div>
+              <strong>{daysToEvent <= 0 ? '就在今天' : `还有 ${daysToEvent} 天`}</strong>
+              <span>下次{nextEvent.type === 'vaccine' ? '疫苗' : '儿保'}：{nextEvent.label}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function NextEventCard({ event, type, subtitle, today }) {
+  const date = new Date(event.date + 'T00:00:00');
+  const daysLeft = daysBetween(today, event.date);
+  return (
+    <div className="next-event">
+      <div className={`date-block ${type === 'care' ? 'teal' : ''}`}>
+        <strong>{date.getDate()}</strong>
+        <span>{date.toLocaleDateString('zh-CN', { month: 'short' })}</span>
+      </div>
+      <div>
+        <strong>{event.name || event.label}</strong>
+        <span>{subtitle}</span>
+        <div className="countdown-pill">
+          <Sparkles size={11} />
+          {daysLeft <= 0 ? '今天' : `${daysLeft} 天后`}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Growth View ---------- */
 
 function GrowthView({ weights, carePlan, latestWeight, weightChange }) {
-  return <div className="detail-layout">
-    <section className="section-card detail-main">
-      <SectionTitle eyebrow="成长趋势" title="体重记录"/>
-      <div className="detail-summary"><div><span>最新体重</span><strong>{latestWeight ? formatWeight(latestWeight.weight) : '--'} <small>kg</small></strong></div><Delta value={weightChange} suffix=" kg" label="较上次"/></div>
-      <WeightChart weights={weights} large/>
-      <div className="record-table">
-        <div className="table-head"><span>日期</span><span>体重</span><span>较上次</span></div>
-        {weights.map((item, index) => {
-          const older = weights[index + 1];
-          return <div className="table-row" key={item.date}><span>{formatDate(item.date)}</span><strong>{formatWeight(item.weight)} kg</strong><Delta value={older ? item.weight - older.weight : null} suffix=" kg"/></div>;
-        })}
-      </div>
-    </section>
-    <div className="detail-stack">
-      <section className="section-card detail-side care-plan-card">
-        <SectionTitle eyebrow="疫苗 · 卓正儿保" title="儿童保健计划"/>
-        <CarePlanTimeline items={carePlan}/>
+  return (
+    <div className="detail-layout">
+      <section className="section-card detail-main">
+        <SectionTitle eyebrow="成长趋势" title="体重记录" />
+        <div className="detail-summary">
+          <div>
+            <span>最新体重</span>
+            <strong>{latestWeight ? formatWeight(latestWeight.weight) : '--'} <small>kg</small></strong>
+          </div>
+          <Delta value={weightChange} suffix=" kg" label="较上次" deltaType="weight" />
+        </div>
+        <WeightChart weights={weights} large />
+        <div className="record-table">
+          <div className="table-head"><span>日期</span><span>体重</span><span>较上次</span></div>
+          {weights.map((item, index) => {
+            const older = weights[index + 1];
+            return (
+              <div className="table-row" key={item.date}>
+                <span>{formatDate(item.date)}</span>
+                <strong>{formatWeight(item.weight)} kg</strong>
+                <Delta value={older ? item.weight - older.weight : null} suffix=" kg" deltaType="weight" />
+              </div>
+            );
+          })}
+        </div>
       </section>
+
+      <div className="detail-stack">
+        <section className="section-card detail-side care-plan-card">
+          <SectionTitle eyebrow="疫苗 · 卓正儿保" title="儿童保健计划" />
+          <CarePlanTimeline items={carePlan} />
+        </section>
+      </div>
     </div>
-  </div>;
+  );
 }
 
 function CarePlanTimeline({ items }) {
   const today = new Date().toISOString().slice(0, 10);
+  const [expanded, setExpanded] = useState(false);
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
   const nextIndex = items.findIndex((item) => !item.actualDate && !isCompletedStatus(item.status) && item.date >= today);
-  if (!items.length) return <Empty text="暂无儿童保健计划"/>;
-  return <div className="timeline care-timeline">{items.map((item, index) => {
-    const completed = Boolean(item.actualDate) || isCompletedStatus(item.status) || index < nextIndex || nextIndex < 0;
-    const markerClass = completed ? 'done' : index === nextIndex ? 'current' : '';
-    return <div className="timeline-item" key={[item.recordType, item.planId || item.id || item.name || item.label, item.date, item.originalIndex].join('-')}>
-      <i className={markerClass}/>
-      <div>
-        <div className="timeline-meta">
-          <span>{formatDate(item.date)}{item.weekday ? ' · ' + item.weekday : ''}</span>
-          <b className={'source-tag ' + item.recordType}>{item.source || (item.recordType === 'vaccine' ? '疫苗' : '卓正儿保')}</b>
-          {item.status && <em>{item.status}</em>}
-        </div>
-        <strong>{item.name || item.label}</strong>
+
+  const visibleItems = useMemo(() => {
+    if (!isMobile || expanded || nextIndex <= 0) return items;
+    return items.filter((_, index) => index >= Math.max(0, nextIndex - 1));
+  }, [items, isMobile, expanded, nextIndex]);
+
+  const hiddenCount = items.length - visibleItems.length;
+
+  if (!items.length) return <Empty text="暂无儿童保健计划" />;
+
+  return (
+    <>
+      <div className="timeline care-timeline">
+        {visibleItems.map((item, index) => {
+          const completed = Boolean(item.actualDate) || isCompletedStatus(item.status) || index < nextIndex || nextIndex < 0;
+          const markerClass = completed ? 'done' : item === items[nextIndex] ? 'current' : '';
+          return (
+            <div className="timeline-item" key={[item.recordType, item.planId || item.id || item.name || item.label, item.date, item.originalIndex].join('-')}>
+              <i className={markerClass} />
+              <div>
+                <div className="timeline-meta">
+                  <span>{formatDate(item.date)}{item.weekday ? ' · ' + item.weekday : ''}</span>
+                  <b className={'source-tag ' + item.recordType}>{item.source || (item.recordType === 'vaccine' ? '疫苗' : '卓正儿保')}</b>
+                  {item.status && <em>{item.status}</em>}
+                </div>
+                <strong>{item.name || item.label}</strong>
+              </div>
+            </div>
+          );
+        })}
       </div>
-    </div>;
-  })}</div>;
+      {isMobile && hiddenCount > 0 && (
+        <button className="timeline-toggle" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? <><ChevronUp size={14} /> 收起已完成项目</> : <><ChevronDown size={14} /> 展开 {hiddenCount} 项已完成</>}
+        </button>
+      )}
+    </>
+  );
 }
 
-function isCompletedStatus(status) {
-  return /(已完成|已接种|completed|done)/i.test(String(status || ''));
-}
+/* ---------- Ledger View ---------- */
 
 function LedgerView({ months, transactions, currentMonth, expenseChange }) {
-  return <>
-    <section className="metric-grid compact">
-      <Metric icon={CircleDollarSign} tone="red" label="本月支出" value={formatCurrency(currentMonth?.expense || 0)} detail="当前自然月" delta={expenseChange} currencyDelta/>
-      <Metric icon={CalendarDays} tone="blue" label="近六个月" value={formatCurrency(months.reduce((sum, item) => sum + Number(item.expense || 0), 0))} detail="累计支出"/>
-    </section>
-    <div className="detail-layout ledger-layout">
-      <section className="section-card detail-main"><SectionTitle eyebrow="月度趋势" title="近六个月支出"/><ExpenseChart months={months} large/></section>
-      <section className="section-card detail-side"><SectionTitle eyebrow="消费明细" title="最近账目"/><TransactionList items={transactions}/></section>
-    </div>
-  </>;
+  return (
+    <>
+      <section className="metric-grid compact">
+        <Metric icon={CircleDollarSign} tone="red" label="本月支出" value={formatCurrency(currentMonth?.expense || 0)} detail="当前自然月" delta={expenseChange} currencyDelta deltaType="expense" />
+        <Metric icon={CalendarDays} tone="blue" label="近六个月" value={formatCurrency(months.reduce((sum, item) => sum + Number(item.expense || 0), 0))} detail="累计支出" />
+      </section>
+      <div className="detail-layout ledger-layout">
+        <section className="section-card detail-main">
+          <SectionTitle eyebrow="月度趋势" title="近六个月支出" />
+          <ExpenseChart months={months} large />
+        </section>
+        <section className="section-card detail-side">
+          <SectionTitle eyebrow="消费明细" title="最近账目" />
+          <TransactionList items={transactions} />
+        </section>
+      </div>
+    </>
+  );
 }
+
+/* ---------- Pantry View ---------- */
 
 function PantryView({ pantry }) {
-  return <>
-    <section className="metric-grid compact three">
-      <Metric icon={PackageCheck} tone="teal" label="启用商品" value={String(pantry.total || 0)} unit="种" detail="用品总数"/>
-      <Metric icon={ShoppingBag} tone="amber" label="待补货" value={String(pantry.low || 0)} unit="项" detail="低库存与缺货"/>
-      <Metric icon={CalendarDays} tone="red" label="近期临期" value={String(pantry.nearExpiry || 0)} unit="项" detail="未来 30 天"/>
-    </section>
-    <section className="section-card"><SectionTitle eyebrow="库存关注" title="补货清单"/><div className="inventory-table"><div className="inventory-head"><span>商品</span><span>当前库存</span><span>状态</span></div>{pantry.items?.length ? pantry.items.map((item) => <div className="inventory-row" key={item.name}><div><span className="item-icon"><PackageCheck size={16}/></span><strong>{item.name}</strong></div><b>{item.stock} {item.unit}</b><span className="tag warning">{item.status || '需关注'}</span></div>) : <Empty text="当前没有需要关注的库存"/>}</div></section>
-  </>;
+  return (
+    <>
+      <section className="metric-grid compact three">
+        <Metric icon={PackageCheck} tone="teal" label="启用商品" value={String(pantry.total || 0)} unit="种" detail="用品总数" />
+        <Metric icon={ShoppingBag} tone="amber" label="待补货" value={String(pantry.low || 0)} unit="项" detail="低库存与缺货" />
+        <Metric icon={CalendarDays} tone="red" label="近期临期" value={String(pantry.nearExpiry || 0)} unit="项" detail="未来 30 天" />
+      </section>
+      <section className="section-card">
+        <SectionTitle eyebrow="库存关注" title="补货清单" />
+        <div className="inventory-table">
+          <div className="inventory-head"><span>商品</span><span>当前库存</span><span>状态</span></div>
+          {pantry.items?.length ? (
+            pantry.items.map((item) => (
+              <div className="inventory-row" key={item.name}>
+                <div>
+                  <span className="item-icon"><PackageCheck size={16} /></span>
+                  <strong>{item.name}</strong>
+                </div>
+                <b>{item.stock} {item.unit}</b>
+                <StatusTag status={item.status} />
+              </div>
+            ))
+          ) : (
+            <Empty text="当前没有需要关注的库存" />
+          )}
+        </div>
+      </section>
+    </>
+  );
 }
 
-function Metric({ icon: Icon, tone, label, value, unit, detail, delta, deltaUnit, currencyDelta }) {
-  return <div className="metric-card"><span className={'metric-icon ' + tone}><Icon size={19}/></span><div className="metric-label">{label}</div><div className="metric-value">{value}{unit && <small>{unit}</small>}</div><div className="metric-foot"><span>{detail}</span>{delta !== undefined && delta !== null && <Delta value={delta} suffix={currencyDelta ? '' : deltaUnit} currency={currencyDelta}/>}</div></div>;
+function StatusTag({ status }) {
+  const text = status || '需关注';
+  let tone = 'warning';
+  if (/缺货|耗尽|紧急/.test(text)) tone = 'danger';
+  if (/充足|正常/.test(text)) tone = 'success';
+  return <span className={`tag ${tone}`}>{text}</span>;
 }
 
-function Delta({ value, suffix = '', label, currency }) {
+/* ---------- Reusable Components ---------- */
+
+function Metric({ icon: Icon, tone, label, value, unit, detail, delta, deltaUnit, currencyDelta, deltaType }) {
+  return (
+    <div className="metric-card">
+      <span className={`metric-icon ${tone}`}><Icon size={20} /></span>
+      <div className="metric-label">{label}</div>
+      <div className="metric-value">{value}{unit && <small>{unit}</small>}</div>
+      <div className="metric-foot">
+        <span>{detail}</span>
+        {delta !== undefined && delta !== null && (
+          <Delta value={delta} suffix={currencyDelta ? '' : deltaUnit} currency={currencyDelta} deltaType={deltaType} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Delta({ value, suffix = '', label, currency, deltaType }) {
   if (value === null || value === undefined) return <span className="delta neutral">--</span>;
-  const positive = Number(value) >= 0;
-  return <span className={'delta ' + (positive ? 'up' : 'down')}>{positive ? <ArrowUpRight size={13}/> : <ArrowDownRight size={13}/>} {currency ? formatCurrency(Math.abs(value)) : Math.abs(value).toFixed(3).replace(/0+$/, '').replace(/\.$/, '') + suffix}{label && <em>{label}</em>}</span>;
+  const num = Number(value);
+  const positive = num >= 0;
+
+  // Semantic mapping: weight up = good (green), expense up = bad (red)
+  let tone = positive ? 'up' : 'down';
+  if (deltaType === 'weight') {
+    tone = positive ? 'positive' : 'negative';
+  } else if (deltaType === 'expense') {
+    tone = positive ? 'negative' : 'positive';
+  }
+
+  const absValue = currency ? formatCurrency(Math.abs(num)) : Math.abs(num).toFixed(3).replace(/0+$/, '').replace(/\.$/, '') + suffix;
+
+  return (
+    <span className={`delta ${tone}`}>
+      {positive ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+      {absValue}
+      {label && <em>{label}</em>}
+    </span>
+  );
 }
 
 function WeightChart({ weights, large }) {
+  const containerRef = useRef(null);
+  const [tooltip, setTooltip] = useState(null);
   const items = weights.slice(0, large ? 12 : 8).reverse();
-  if (!items.length) return <Empty text="暂无体重记录"/>;
+
+  if (!items.length) return <Empty text="暂无体重记录" />;
+
   const values = items.map((item) => Number(item.weight));
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const padding = Math.max((max - min) * .2, .05);
+  const padding = Math.max((max - min) * 0.2, 0.05);
   const low = min - padding;
   const high = max + padding;
   const width = 640;
-  const height = large ? 270 : 210;
+  const height = large ? 290 : 220;
   const x = (index) => 36 + index * ((width - 72) / Math.max(items.length - 1, 1));
-  const y = (value) => 20 + (high - value) / Math.max(high - low, .1) * (height - 58);
+  const y = (value) => 20 + (high - value) / Math.max(high - low, 0.1) * (height - 58);
   const points = items.map((item, index) => x(index) + ',' + y(item.weight)).join(' ');
-  return <div className={'line-chart ' + (large ? 'large' : '')}><svg viewBox={'0 0 ' + width + ' ' + height} role="img" aria-label="体重趋势图"><line x1="36" y1={height - 38} x2={width - 20} y2={height - 38} className="axis-line"/><polyline points={points} className="weight-line"/>{items.map((item, index) => <g key={item.date}><circle cx={x(index)} cy={y(item.weight)} r={index === items.length - 1 ? 6 : 4} className={index === items.length - 1 ? 'point latest' : 'point'}/><text x={x(index)} y={height - 16} textAnchor="middle" className="chart-label">{shortDate(item.date)}</text>{(large || index === items.length - 1) && <text x={x(index)} y={y(item.weight) - 12} textAnchor="middle" className="chart-value">{formatWeight(item.weight)}</text>}</g>)}</svg></div>;
+  const areaPoints = `${x(0)},${height - 38} ${points} ${x(items.length - 1)},${height - 38}`;
+
+  const gridLines = [0.25, 0.5, 0.75].map((ratio) => (
+    <line
+      key={ratio}
+      x1="36"
+      y1={20 + ratio * (height - 58)}
+      x2={width - 20}
+      y2={20 + ratio * (height - 58)}
+      className="chart-grid-line"
+    />
+  ));
+
+  return (
+    <div className={`line-chart ${large ? 'large' : ''}`} ref={containerRef}>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="体重趋势图">
+        <defs>
+          <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--teal-500)" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="var(--teal-500)" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        {gridLines}
+        <line x1="36" y1={height - 38} x2={width - 20} y2={height - 38} className="axis-line" />
+        <polyline points={areaPoints} className="weight-area" />
+        <polyline points={points} className="weight-line" />
+        {items.map((item, index) => (
+          <g key={item.date}>
+            <circle
+              cx={x(index)}
+              cy={y(item.weight)}
+              r={index === items.length - 1 ? 6 : 4}
+              className={index === items.length - 1 ? 'point latest' : 'point'}
+              onMouseEnter={() => setTooltip({
+                x: (x(index) / width) * 100,
+                y: (y(item.weight) / height) * 100,
+                text: `${formatDate(item.date)} · ${formatWeight(item.weight)} kg`,
+              })}
+              onMouseLeave={() => setTooltip(null)}
+            />
+            <text x={x(index)} y={height - 16} textAnchor="middle" className="chart-label">{shortDate(item.date)}</text>
+            {(large || index === items.length - 1) && (
+              <text x={x(index)} y={y(item.weight) - 12} textAnchor="middle" className="chart-value">{formatWeight(item.weight)}</text>
+            )}
+          </g>
+        ))}
+      </svg>
+      {tooltip && (
+        <div
+          className={`chart-tooltip ${tooltip ? 'visible' : ''}`}
+          style={{ left: `${tooltip.x}%`, top: `${tooltip.y}%` }}
+        >
+          {tooltip.text}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ExpenseChart({ months, large }) {
-  if (!months.length) return <Empty text="暂无支出记录"/>;
+  if (!months.length) return <Empty text="暂无支出记录" />;
   const max = Math.max(...months.map((item) => Number(item.expense || 0)), 1);
-  return <div className={'expense-chart ' + (large ? 'large' : '')}>{months.map((item) => <div className="expense-column" key={item.month}><div className="expense-value">{item.expense ? compactCurrency(item.expense) : '¥0'}</div><div className="expense-track"><div className="expense-bar" style={{ height: Math.max(4, Number(item.expense || 0) / max * 100) + '%' }}/></div><span>{item.month}</span></div>)}</div>;
+  const currentMonthStr = new Date().toISOString().slice(0, 7);
+
+  return (
+    <div className={`expense-chart ${large ? 'large' : ''}`}>
+      {months.map((item) => {
+        const isCurrent = item.month === currentMonthStr;
+        return (
+          <div className={`expense-column ${isCurrent ? 'current' : ''}`} key={item.month}>
+            <div className="expense-value">{item.expense ? compactCurrency(item.expense) : '¥0'}</div>
+            <div className="expense-track">
+              <div className="expense-bar" style={{ height: Math.max(4, Number(item.expense || 0) / max * 100) + '%' }} />
+            </div>
+            <span>{item.month}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function TransactionList({ items }) {
-  if (!items.length) return <Empty text="暂无账目"/>;
-  return <div className="transaction-list">{items.map((item, index) => <div className="transaction-row" key={(item.date || '') + index}><span className="item-icon money"><WalletCards size={16}/></span><div><strong>{item.title || '家庭支出'}</strong><span>{formatDate(item.date)} · {item.category || '未分类'}</span></div><b>{formatCurrency(Math.abs(Number(item.amount || 0)))}</b></div>)}</div>;
+  if (!items.length) return <Empty text="暂无账目" />;
+  return (
+    <div className="transaction-list">
+      {items.map((item, index) => (
+        <div className="transaction-row" key={(item.date || '') + index}>
+          <span className="item-icon money"><WalletCards size={16} /></span>
+          <div>
+            <strong>{item.title || '家庭支出'}</strong>
+            <span>{formatDate(item.date)} · {item.category || '未分类'}</span>
+          </div>
+          <b>{formatCurrency(Math.abs(Number(item.amount || 0)))}</b>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function SourceStatus({ sources }) {
   if (!sources.length) return null;
-  return <div className="source-strip">{sources.map((source) => <span key={source.name} className={source.ok ? 'online' : 'offline'}><i/>{source.name}<b>{source.ok ? '已连接' : '待配置'}</b></span>)}</div>;
+  return (
+    <div className="source-strip">
+      {sources.map((source) => (
+        <span key={source.name} className={source.ok ? 'online' : 'offline'}>
+          <i />
+          {source.name}
+          <b>{source.ok ? '已连接' : '待配置'}</b>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function SectionTitle({ eyebrow, title, action, onClick }) {
-  return <div className="section-title"><div><span>{eyebrow}</span><h2>{title}</h2></div>{action && <button onClick={onClick}>{action}</button>}</div>;
+  return (
+    <div className="section-title">
+      <div>
+        <span>{eyebrow}</span>
+        <h2>{title}</h2>
+      </div>
+      {action && <button onClick={onClick}>{action}</button>}
+    </div>
+  );
 }
 
 function NavButton({ item, active, onClick, mobile }) {
   const Icon = item.icon;
-  return <button className={active ? 'active' : ''} onClick={onClick}><Icon size={mobile ? 19 : 18}/><span>{mobile ? item.short : item.label}</span></button>;
+  return (
+    <button className={active ? 'active' : ''} onClick={onClick} aria-current={active ? 'page' : undefined}>
+      <Icon size={mobile ? 20 : 18} />
+      <span>{mobile ? item.short : item.label}</span>
+    </button>
+  );
 }
 
 function Empty({ text }) {
-  return <div className="empty"><CheckCircle2 size={20}/><span>{text}</span></div>;
+  return (
+    <div className="empty">
+      <CheckCircle2 size={20} />
+      <span>{text}</span>
+    </div>
+  );
 }
 
-function formatCurrency(value) {
-  return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', minimumFractionDigits: 2 }).format(Number(value || 0));
-}
-function compactCurrency(value) {
-  return '¥' + new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(value || 0));
-}
-function formatWeight(value) {
-  return Number(value).toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
-}
-function formatDate(value, compact = false) {
-  if (!value) return '--';
-  const date = new Date(String(value).slice(0, 10) + 'T00:00:00');
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleDateString('zh-CN', compact ? { month: 'short', day: 'numeric' } : { year: 'numeric', month: 'long', day: 'numeric' });
-}
-function shortDate(value) {
-  return String(value || '').slice(5).replace('-', '/');
-}
-
-createRoot(document.getElementById('root')).render(<App/>);
+createRoot(document.getElementById('root')).render(<App />);
