@@ -43,25 +43,47 @@ function CareTimeline({ items }) {
       : enriched;
 
   const collapseActive = filter === 'all' && isMobile && collapseStart > 0;
-  const visibleItems = collapseActive && !expanded ? filtered.slice(collapseStart) : filtered;
-  const hiddenCount = collapseActive ? collapseStart : 0;
+  const collapsedItems = collapseActive && !expanded
+    ? filtered.slice(0, collapseStart).filter((item) => item.completed)
+    : [];
+  const visibleItems = collapsedItems.length
+    ? filtered.filter((item) => !collapsedItems.includes(item))
+    : filtered;
+  const hiddenCount = collapsedItems.length;
+
+  const handleFilterKeyDown = (event, index) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? TIMELINE_FILTERS.length - 1
+        : (index + (event.key === 'ArrowRight' ? 1 : -1) + TIMELINE_FILTERS.length) % TIMELINE_FILTERS.length;
+    setFilter(TIMELINE_FILTERS[nextIndex].id);
+    document.getElementById(`care-filter-${TIMELINE_FILTERS[nextIndex].id}`)?.focus();
+  };
 
   return (
     <>
       <div className="chip-row" role="tablist" aria-label="时间线筛选">
-        {TIMELINE_FILTERS.map((option) => (
+        {TIMELINE_FILTERS.map((option, index) => (
           <button
             key={option.id}
+            id={`care-filter-${option.id}`}
             className={`chip ${filter === option.id ? 'active' : ''}`}
             onClick={() => setFilter(option.id)}
+            onKeyDown={(event) => handleFilterKeyDown(event, index)}
             role="tab"
             aria-selected={filter === option.id}
+            aria-controls="care-timeline-panel"
+            tabIndex={filter === option.id ? 0 : -1}
           >
             {option.label}{option.id === 'todo' && counts.todo ? ` · ${counts.todo}` : ''}{option.id === 'done' && counts.done ? ` · ${counts.done}` : ''}
           </button>
         ))}
       </div>
-      {visibleItems.length ? (
+      <div id="care-timeline-panel" role="tabpanel" aria-labelledby={`care-filter-${filter}`}>
+        {visibleItems.length ? (
         <div className="timeline care-timeline">
           {visibleItems.map((item) => {
             const markerClass = item.completed ? 'done' : item === enriched[nextIndex] ? 'current' : item.overdue ? 'overdue' : '';
@@ -81,8 +103,14 @@ function CareTimeline({ items }) {
           })}
         </div>
       ) : <Empty text="没有符合条件的项目" small />}
+      </div>
       {hiddenCount > 0 && (
-        <button className="timeline-toggle" onClick={() => setExpanded((value) => !value)}>
+        <button
+          className="timeline-toggle"
+          onClick={() => setExpanded((value) => !value)}
+          aria-expanded={expanded}
+          aria-controls="care-timeline-panel"
+        >
           {expanded ? <><ChevronUp size={14} /> 收起已完成项目</> : <><ChevronDown size={14} /> 展开 {hiddenCount} 项已完成</>}
         </button>
       )}

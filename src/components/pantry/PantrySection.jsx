@@ -53,6 +53,18 @@ export default function PantrySection({ pantry }) {
     });
   }, [allItems, filter, query]);
 
+  const handleFilterKeyDown = (event, index) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? PANTRY_FILTERS.length - 1
+        : (index + (event.key === 'ArrowRight' ? 1 : -1) + PANTRY_FILTERS.length) % PANTRY_FILTERS.length;
+    setFilter(PANTRY_FILTERS[nextIndex].id);
+    document.getElementById(`pantry-filter-${PANTRY_FILTERS[nextIndex].id}`)?.focus();
+  };
+
   return (
     <section className="chapter" id="chapter-pantry" data-chapter="pantry">
       <ChapterHeading number="04" en="BABY PANTRY" title="用品库存" lead={chapterLeads.pantry} />
@@ -111,13 +123,17 @@ export default function PantrySection({ pantry }) {
         <SectionTitle eyebrow="全部用品" title={`完整库存 · ${allItems.length} 项`} />
         <div className="pantry-toolbar">
           <div className="filter-tabs" role="tablist" aria-label="库存筛选">
-            {PANTRY_FILTERS.map((option) => (
+            {PANTRY_FILTERS.map((option, index) => (
               <button
                 key={option.id}
+                id={`pantry-filter-${option.id}`}
                 className={`filter-tab ${filter === option.id ? 'active' : ''}`}
                 onClick={() => setFilter(option.id)}
+                onKeyDown={(event) => handleFilterKeyDown(event, index)}
                 role="tab"
                 aria-selected={filter === option.id}
+                aria-controls="pantry-inventory-panel"
+                tabIndex={filter === option.id ? 0 : -1}
               >
                 {option.label}
                 <b>{counts[option.id]}</b>
@@ -135,7 +151,7 @@ export default function PantrySection({ pantry }) {
             />
           </label>
         </div>
-        <div className="inventory-table">
+        <div id="pantry-inventory-panel" role="tabpanel" aria-labelledby={`pantry-filter-${filter}`} className="inventory-table">
           <div className="inventory-head"><span>商品</span><span>库存水位</span><span>当前库存</span><span>状态</span></div>
           {visibleItems.length ? (
             visibleItems.map((item) => (
