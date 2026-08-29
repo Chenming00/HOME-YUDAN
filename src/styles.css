@@ -391,6 +391,8 @@
   .metric-foot { display: grid; justify-content: start; }
   .detail-layout { grid-template-columns: 1fr; gap: 0; }
   .detail-side { position: static; }
+  .growth-tabs { display: flex; gap: 7px; margin-bottom: 14px; }
+  .growth-tabs .chip { flex: 1; }
   .line-chart.large { height: 245px; }
   .expense-chart.large { height: 230px; gap: 7px; }
   .table-head { display: none; }

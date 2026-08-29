@@ -123,42 +123,86 @@ function CareTimeline({ items }) {
   );
 }
 
+const GROWTH_TABS = [
+  { id: 'weight', label: '体重' },
+  { id: 'care', label: '保健' },
+];
+
 export default function GrowthSection({ weights, carePlan, latestWeight, weightChange }) {
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const [activeTab, setActiveTab] = useState('weight');
+
+  const weightCard = (
+    <Card className="section-card detail-main">
+      <SectionTitle eyebrow="成长趋势" title="体重记录" />
+      <div className="detail-summary">
+        <div>
+          <span>最新体重</span>
+          <strong>{latestWeight ? formatWeight(latestWeight.weight) : '--'} <small>kg</small></strong>
+        </div>
+        <Delta value={weightChange} suffix=" kg" label="较上次" deltaType="weight" />
+      </div>
+      <WeightChart weights={weights} large />
+      <div className="record-table">
+        <div className="table-head"><span>日期</span><span>体重</span><span>较上次</span></div>
+        {weights.map((item, index) => {
+          const older = weights[index + 1];
+          return (
+            <div className="table-row" key={item.date}>
+              <span>{formatDate(item.date)}</span>
+              <strong>{formatWeight(item.weight)} kg</strong>
+              <Delta value={older ? item.weight - older.weight : null} suffix=" kg" deltaType="weight" />
+            </div>
+          );
+        })}
+      </div>
+      {!weights.length && <Empty text="暂无体重记录" />}
+    </Card>
+  );
+
+  const careCard = (
+    <Card className="section-card detail-side care-plan-card">
+      <SectionTitle eyebrow="疫苗 · 卓正儿保" title="儿童保健计划" />
+      <CareTimeline items={carePlan} />
+    </Card>
+  );
+
   return (
     <section className="chapter" id="chapter-growth" data-chapter="growth">
       <ChapterHeading number="02" en="GROWTH & CARE" title="成长健康" lead={chapterLeads.growth} />
 
-      <div className="detail-layout">
-        <Card className="section-card detail-main">
-          <SectionTitle eyebrow="成长趋势" title="体重记录" />
-          <div className="detail-summary">
-            <div>
-              <span>最新体重</span>
-              <strong>{latestWeight ? formatWeight(latestWeight.weight) : '--'} <small>kg</small></strong>
-            </div>
-            <Delta value={weightChange} suffix=" kg" label="较上次" deltaType="weight" />
-          </div>
-          <WeightChart weights={weights} large />
-          <div className="record-table">
-            <div className="table-head"><span>日期</span><span>体重</span><span>较上次</span></div>
-            {weights.map((item, index) => {
-              const older = weights[index + 1];
-              return (
-                <div className="table-row" key={item.date}>
-                  <span>{formatDate(item.date)}</span>
-                  <strong>{formatWeight(item.weight)} kg</strong>
-                  <Delta value={older ? item.weight - older.weight : null} suffix=" kg" deltaType="weight" />
-                </div>
-              );
-            })}
-          </div>
-          {!weights.length && <Empty text="暂无体重记录" />}
-        </Card>
+      {isMobile && (
+        <div className="growth-tabs" role="tablist" aria-label="成长健康切换">
+          {GROWTH_TABS.map((tab) => (
+            <Button
+              key={tab.id}
+              variant={activeTab === tab.id ? 'default' : 'outline'}
+              size="sm"
+              className={`chip ${activeTab === tab.id ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`growth-panel-${tab.id}`}
+            >
+              {tab.label}
+            </Button>
+          ))}
+        </div>
+      )}
 
-        <Card className="section-card detail-side care-plan-card">
-          <SectionTitle eyebrow="疫苗 · 卓正儿保" title="儿童保健计划" />
-          <CareTimeline items={carePlan} />
-        </Card>
+      <div className="detail-layout">
+        {isMobile ? (
+          activeTab === 'weight' ? (
+            <div id="growth-panel-weight" role="tabpanel">{weightCard}</div>
+          ) : (
+            <div id="growth-panel-care" role="tabpanel">{careCard}</div>
+          )
+        ) : (
+          <>
+            {weightCard}
+            {careCard}
+          </>
+        )}
       </div>
     </section>
   );
