@@ -23,13 +23,14 @@ function CareTimeline({ items }) {
   const [expanded, setExpanded] = useState(false);
   const isMobile = useMediaQuery('(max-width: 767px)');
 
-  const nextIndex = items.findIndex((item) => !item.actualDate && !isCompletedStatus(item.status) && item.date >= today);
-  const collapseStart = nextIndex > 0 ? Math.max(0, nextIndex - 1) : 0;
-
   const enriched = useMemo(() => items.map((item) => {
-    const completed = Boolean(item.actualDate) || isCompletedStatus(item.status);
-    return { ...item, completed, overdue: !completed && item.date < today };
+    const autoCompleted = item.recordType === 'care' && item.date < today;
+    const completed = autoCompleted || Boolean(item.actualDate) || isCompletedStatus(item.status);
+    return { ...item, autoCompleted, completed, overdue: !completed && item.date < today, status: autoCompleted ? '已完成' : item.status };
   }), [items, today]);
+
+  const nextIndex = enriched.findIndex((item) => !item.completed && item.date >= today);
+  const collapseStart = nextIndex > 0 ? Math.max(0, nextIndex - 1) : 0;
 
   const counts = useMemo(() => ({
     todo: enriched.filter((item) => !item.completed).length,
