@@ -22,21 +22,15 @@ export default defineConfig({
       name: 'dev-api-home',
       configureServer(server) {
         server.middlewares.use('/api/home', async (request, response) => {
-          let statusCode = 200;
-          response.status = (code) => {
-            statusCode = code;
-            return response;
-          };
-          response.json = (payload) => {
-            response.statusCode = statusCode;
-            response.setHeader('Content-Type', 'application/json');
-            response.end(JSON.stringify(payload));
-          };
           try {
             await homeHandler(request, response);
           } catch (error) {
-            if (!response.headersSent) response.statusCode = 500;
-            response.end(JSON.stringify({ message: String(error) }));
+            console.error('[dev-api-home]', error);
+            if (!response.headersSent) {
+              response.statusCode = 500;
+              response.setHeader('Content-Type', 'application/json');
+              response.end(JSON.stringify({ message: '服务器内部错误' }));
+            }
           }
         });
       },

@@ -2,8 +2,8 @@ import { Badge } from '@/components/ui/badge';
 
 export default function SourceStatus({ sources }) {
   if (!sources.length) return null;
-  const offline = sources.filter((source) => !source.ok);
-  if (!offline.length) {
+  const allOnline = sources.every((source) => source.ok);
+  if (allOnline) {
     return (
       <div className="source-strip source-summary">
         <Badge variant="outline" className="online"><i />{sources.length} 个数据源正常</Badge>

@@ -7,8 +7,13 @@ export function useMediaQuery(query) {
     const media = window.matchMedia(query);
     const update = () => setMatches(media.matches);
     update();
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
+    // 兼容旧版 Safari (<14 不支持 addEventListener)
+    if (media.addEventListener) {
+      media.addEventListener('change', update);
+      return () => media.removeEventListener('change', update);
+    }
+    media.addListener(update);
+    return () => media.removeListener(update);
   }, [query]);
 
   return matches;

@@ -290,6 +290,7 @@
 .transaction-row strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 610; }
 .transaction-row > div > span { display: block; margin-top: 3px; color: var(--muted-foreground); font-size: 10px; }
 .transaction-row > b { font-size: 12px; font-weight: 620; font-variant-numeric: tabular-nums; }
+.transaction-row > b.tx-negative { color: var(--clay); }
 .tx-tag { margin-left: 5px; vertical-align: 1px; }
 .breakdown-list { display: grid; }
 .breakdown-row { display: grid; gap: 7px; padding: 11px 0; border-bottom: 1px solid var(--line-soft); }

@@ -135,7 +135,11 @@ function pantryOf(value, products, attention) {
 }
 
 export default async function handler(request, response) {
-  if (request.method !== 'GET') return response.status(405).json({ message: 'Method Not Allowed' });
+  if (request.method !== 'GET') {
+    response.statusCode = 405;
+    response.setHeader('Content-Type', 'application/json');
+    return response.end(JSON.stringify({ message: 'Method Not Allowed' }));
+  }
   const logKey = process.env.YUDAN_LOG_API_KEY;
   const pantryKey = process.env.YUDAN_PANTRY_API_KEY;
   const [monthly, list, growth, vaccines, care, dashboard, products, attention] = await Promise.all([
@@ -156,12 +160,14 @@ export default async function handler(request, response) {
     { name: '鱼蛋宝贝消耗品', ok: dashboard.ok || products.ok, requiresKey: !pantryKey && !dashboard.ok },
   ];
   response.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=600');
-  return response.status(200).json({
+  response.statusCode = 200;
+  response.setHeader('Content-Type', 'application/json');
+  return response.end(JSON.stringify({
     meta: { mode: sources.every((source) => source.ok) ? 'live' : 'partial', updatedAt: new Date().toISOString(), sources },
     ledger: { monthly: monthly.data, transactions: transactionsOf(list.data) },
     growth: { weights: weightsOf(growth.data) },
     vaccines: vaccinesOf(vaccines.data),
     care: careOf(care.data),
     pantry: pantryOf(dashboard.data, products.data, attention.data),
-  });
+  }));
 }
