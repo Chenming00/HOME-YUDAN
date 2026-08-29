@@ -1,5 +1,6 @@
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils.js';
+import { Card } from '@/components/ui/card';
 
 export function Delta({ value, suffix = '', label, currency, deltaType }) {
   if (value === null || value === undefined) return <span className="delta neutral">--</span>;
@@ -28,7 +29,7 @@ export function Delta({ value, suffix = '', label, currency, deltaType }) {
 
 export default function Metric({ icon: Icon, tone, label, value, unit, detail, delta, deltaUnit, currencyDelta, deltaType }) {
   return (
-    <div className="metric-card">
+    <Card className="metric-card">
       <span className={`metric-icon ${tone}`}><Icon size={20} /></span>
       <div className="metric-label">{label}</div>
       <div className="metric-value">{value}{unit && <small>{unit}</small>}</div>
@@ -38,6 +39,6 @@ export default function Metric({ icon: Icon, tone, label, value, unit, detail, d
           <Delta value={delta} suffix={currencyDelta ? '' : deltaUnit} currency={currencyDelta} deltaType={deltaType} />
         )}
       </div>
-    </div>
+    </Card>
   );
 }

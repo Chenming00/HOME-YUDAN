@@ -1,8 +1,15 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+import path from 'node:path';
 import homeHandler from './api/home.js';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': path.resolve(import.meta.dirname, './src'),
+    },
+  },
   server: {
     watch: {
       ignored: ['**/node_modules/**', '**/.git/**', '**/.dev-shots/**'],
@@ -10,6 +17,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    tailwindcss(),
     {
       name: 'dev-api-home',
       configureServer(server) {

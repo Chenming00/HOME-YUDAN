@@ -1,18 +1,24 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AlertCircle, ArrowUp } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { BABY_BIRTHDAY_FALLBACK, chapters, emptyData } from './lib/data.js';
 import { daysBetween, isCompletedStatus, shanghaiDateKey } from './lib/utils.js';
-import { useMediaQuery } from './hooks/useMediaQuery.js';
 import TopBar from './components/TopBar.jsx';
 import MobileNav from './components/MobileNav.jsx';
 import SourceStatus from './components/SourceStatus.jsx';
 import LoadingView from './components/LoadingView.jsx';
 import TodaySection from './components/today/TodaySection.jsx';
-import GrowthSection from './components/growth/GrowthSection.jsx';
-import LedgerSection from './components/ledger/LedgerSection.jsx';
-import PantrySection from './components/pantry/PantrySection.jsx';
 import './styles.css';
+
+const sectionLoaders = {
+  growth: () => import('./components/growth/GrowthSection.jsx'),
+  ledger: () => import('./components/ledger/LedgerSection.jsx'),
+  pantry: () => import('./components/pantry/PantrySection.jsx'),
+};
+
+const GrowthSection = lazy(sectionLoaders.growth);
+const LedgerSection = lazy(sectionLoaders.ledger);
+const PantrySection = lazy(sectionLoaders.pantry);
 
 /* ---------- Error boundary ---------- */
 
@@ -52,9 +58,6 @@ function App() {
   const [active, setActive] = useState('today');
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
-  const [topbarScrolled, setTopbarScrolled] = useState(false);
-  const [showBackToTop, setShowBackToTop] = useState(false);
-  const isMobile = useMediaQuery('(max-width: 767px)');
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -72,41 +75,14 @@ function App() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  useEffect(() => {
-    const onScroll = () => {
-      setTopbarScrolled(window.scrollY > 8);
-      setShowBackToTop(window.scrollY > 400);
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  const dataReady = !loading || data.meta?.mode !== 'loading';
-
-  /* Desktop scrollspy: highlight chapter nav while scrolling */
-  useEffect(() => {
-    if (isMobile || !dataReady || typeof document === 'undefined') return undefined;
-    const elements = Array.from(document.querySelectorAll('.chapter[data-chapter]'));
-    if (!elements.length) return undefined;
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) setActive(entry.target.dataset.chapter);
-      });
-    }, { rootMargin: '-30% 0px -55% 0px' });
-    elements.forEach((element) => observer.observe(element));
-    return () => observer.disconnect();
-  }, [isMobile, dataReady]);
-
   const goTo = useCallback((id) => {
     setActive(id);
-    if (isMobile || typeof document === 'undefined') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-    const element = document.getElementById(`chapter-${id}`);
-    if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [isMobile]);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
+  const prefetchSection = useCallback((id) => {
+    sectionLoaders[id]?.();
+  }, []);
 
   /* ---------- Derived data ---------- */
 
@@ -191,20 +167,19 @@ function App() {
   const initialLoading = loading && data.meta?.mode === 'loading';
 
   return (
-    <div className="shell">
+    <div className="app-shell">
       <TopBar
         chapters={chapters}
         active={active}
-        isMobile={isMobile}
-        scrolled={topbarScrolled}
         onSelect={goTo}
+        onPrefetch={prefetchSection}
         syncLabel={syncLabel}
         failed={failed}
         loading={loading}
         onRefresh={refresh}
       />
 
-      <main className="magazine">
+      <main className="dashboard-main">
         {failed && (
           <div className="notice error">
             <AlertCircle size={17} />
@@ -219,30 +194,14 @@ function App() {
         )}
         <SourceStatus sources={data.meta?.sources || []} />
 
-        {initialLoading ? (
-          <LoadingView isMobile={isMobile} active={active} />
-        ) : isMobile ? (
-          <div className="page-transition" key={active}>
-            {renderSection(active)}
-          </div>
-        ) : (
-          <div className="page-transition">
-            {chapters.map((chapter) => (
-              <React.Fragment key={chapter.id}>{renderSection(chapter.id)}</React.Fragment>
-            ))}
-          </div>
+        {initialLoading ? <LoadingView active={active} /> : (
+          <Suspense fallback={<LoadingView active={active} compact />}>
+            <div className="page-transition" key={active}>{renderSection(active)}</div>
+          </Suspense>
         )}
       </main>
 
-      {isMobile && <MobileNav chapters={chapters} active={active} onSelect={goTo} />}
-
-      <button
-        className={`back-to-top ${showBackToTop ? 'visible' : ''}`}
-        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        aria-label="回到顶部"
-      >
-        <ArrowUp size={20} />
-      </button>
+      <MobileNav chapters={chapters} active={active} onSelect={goTo} onPrefetch={prefetchSection} />
     </div>
   );
 }
@@ -258,7 +217,7 @@ if (typeof document !== 'undefined') {
 export { App, AppErrorBoundary };
 export { shanghaiDateKey } from './lib/utils.js';
 
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });

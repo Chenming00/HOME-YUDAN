@@ -7,6 +7,7 @@ import Metric from '../shared/Metric.jsx';
 import SectionTitle from '../shared/SectionTitle.jsx';
 import { chapterLeads } from '../../lib/data.js';
 import { formatCurrency, normalizeBreakdown } from '../../lib/utils.js';
+import { Card } from '@/components/ui/card';
 
 export default function LedgerSection({ months, transactions, currentMonth, expenseChange }) {
   const breakdown = normalizeBreakdown(currentMonth?.categoryBreakdown);
@@ -23,19 +24,19 @@ export default function LedgerSection({ months, transactions, currentMonth, expe
 
       <div className="detail-layout ledger-layout">
         <div className="detail-main">
-          <section className="section-card">
+          <Card className="section-card">
             <SectionTitle eyebrow="月度趋势" title="近六个月支出" />
             <ExpenseChart months={months} large />
-          </section>
-          <section className="section-card">
+          </Card>
+          <Card className="section-card">
             <SectionTitle eyebrow="花在哪里" title="本月分类占比" />
             <CategoryBreakdown breakdown={breakdown} />
-          </section>
+          </Card>
         </div>
-        <section className="section-card detail-side">
+        <Card className="section-card detail-side">
           <SectionTitle eyebrow="消费明细" title="最近账目" />
           <TransactionList items={transactions} />
-        </section>
+        </Card>
       </div>
     </section>
   );

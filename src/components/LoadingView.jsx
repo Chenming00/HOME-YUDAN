@@ -1,76 +1,38 @@
+import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+
 export function MetricSkeleton() {
   return (
-    <div className="metric-card metric-skeleton">
-      <div className="skeleton skeleton-icon" />
-      <div className="skeleton skeleton-label" />
-      <div className="skeleton skeleton-value" />
-    </div>
+    <Card className="metric-card metric-skeleton">
+      <Skeleton className="skeleton-icon" />
+      <Skeleton className="skeleton-label" />
+      <Skeleton className="skeleton-value" />
+    </Card>
   );
 }
 
 export function SectionSkeleton({ tall }) {
   return (
-    <div className="section-card" style={{ minHeight: tall ? 300 : 160 }}>
-      <div className="skeleton" style={{ height: 20, width: '40%', marginBottom: 20 }} />
-      <div className="skeleton" style={{ height: tall ? 200 : 60, width: '100%' }} />
-    </div>
+    <Card className="section-card" style={{ minHeight: tall ? 300 : 160 }}>
+      <Skeleton style={{ height: 20, width: '40%', marginBottom: 20 }} />
+      <Skeleton style={{ height: tall ? 200 : 60, width: '100%' }} />
+    </Card>
   );
 }
 
-export default function LoadingView({ isMobile, active }) {
-  if (isMobile) {
-    return (
-      <div className="page-transition">
-        {active === 'today' && (
-          <>
-            <div className="skeleton" style={{ height: 150, marginBottom: 26 }} />
-            <div className="metric-grid">
-              {[1, 2, 3, 4].map((i) => <MetricSkeleton key={i} />)}
-            </div>
-            <SectionSkeleton tall />
-          </>
-        )}
-        {active === 'growth' && (
-          <>
-            <SectionSkeleton tall />
-            <div style={{ height: 26 }} />
-            <SectionSkeleton tall />
-          </>
-        )}
-        {active === 'ledger' && (
-          <>
-            <div className="metric-grid compact three">
-              <MetricSkeleton />
-              <MetricSkeleton />
-              <MetricSkeleton />
-            </div>
-            <SectionSkeleton tall />
-          </>
-        )}
-        {active === 'pantry' && (
-          <>
-            <div className="metric-grid">
-              {[1, 2, 3, 4].map((i) => <MetricSkeleton key={i} />)}
-            </div>
-            <SectionSkeleton tall />
-          </>
-        )}
-      </div>
-    );
-  }
-
+export default function LoadingView({ active, compact }) {
   return (
     <div className="page-transition">
-      <div className="skeleton" style={{ height: 170, marginBottom: 44 }} />
-      <div className="metric-grid">
-        {[1, 2, 3, 4].map((i) => <MetricSkeleton key={i} />)}
+      <div className="loading-heading">
+        <Skeleton style={{ height: 22, width: 100 }} />
+        <Skeleton style={{ height: 38, width: 220 }} />
       </div>
-      <div style={{ height: 40 }} />
-      <SectionSkeleton tall />
-      <div style={{ height: 30 }} />
-      <SectionSkeleton tall />
-      <div style={{ height: 30 }} />
-      <SectionSkeleton />
+      {active !== 'growth' && (
+        <div className={`metric-grid ${active === 'ledger' ? 'compact three' : ''}`}>
+          {Array.from({ length: active === 'ledger' ? 3 : 4 }, (_, index) => <MetricSkeleton key={index} />)}
+        </div>
+      )}
+      <SectionSkeleton tall={!compact} />
     </div>
   );
 }

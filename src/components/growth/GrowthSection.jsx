@@ -8,6 +8,8 @@ import { Delta } from '../shared/Metric.jsx';
 import { chapterLeads } from '../../lib/data.js';
 import { useMediaQuery } from '../../hooks/useMediaQuery.js';
 import { formatDate, formatWeight, isCompletedStatus, shanghaiDateKey } from '../../lib/utils.js';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
 const TIMELINE_FILTERS = [
   { id: 'all', label: '全部' },
@@ -67,9 +69,11 @@ function CareTimeline({ items }) {
     <>
       <div className="chip-row" role="tablist" aria-label="时间线筛选">
         {TIMELINE_FILTERS.map((option, index) => (
-          <button
+          <Button
             key={option.id}
             id={`care-filter-${option.id}`}
+            variant={filter === option.id ? 'default' : 'outline'}
+            size="sm"
             className={`chip ${filter === option.id ? 'active' : ''}`}
             onClick={() => setFilter(option.id)}
             onKeyDown={(event) => handleFilterKeyDown(event, index)}
@@ -79,7 +83,7 @@ function CareTimeline({ items }) {
             tabIndex={filter === option.id ? 0 : -1}
           >
             {option.label}{option.id === 'todo' && counts.todo ? ` · ${counts.todo}` : ''}{option.id === 'done' && counts.done ? ` · ${counts.done}` : ''}
-          </button>
+          </Button>
         ))}
       </div>
       <div id="care-timeline-panel" role="tabpanel" aria-labelledby={`care-filter-${filter}`}>
@@ -105,14 +109,15 @@ function CareTimeline({ items }) {
       ) : <Empty text="没有符合条件的项目" small />}
       </div>
       {hiddenCount > 0 && (
-        <button
+        <Button
+          variant="outline"
           className="timeline-toggle"
           onClick={() => setExpanded((value) => !value)}
           aria-expanded={expanded}
           aria-controls="care-timeline-panel"
         >
           {expanded ? <><ChevronUp size={14} /> 收起已完成项目</> : <><ChevronDown size={14} /> 展开 {hiddenCount} 项已完成</>}
-        </button>
+        </Button>
       )}
     </>
   );
@@ -124,7 +129,7 @@ export default function GrowthSection({ weights, carePlan, latestWeight, weightC
       <ChapterHeading number="02" en="GROWTH & CARE" title="成长健康" lead={chapterLeads.growth} />
 
       <div className="detail-layout">
-        <section className="section-card detail-main">
+        <Card className="section-card detail-main">
           <SectionTitle eyebrow="成长趋势" title="体重记录" />
           <div className="detail-summary">
             <div>
@@ -148,12 +153,12 @@ export default function GrowthSection({ weights, carePlan, latestWeight, weightC
             })}
           </div>
           {!weights.length && <Empty text="暂无体重记录" />}
-        </section>
+        </Card>
 
-        <section className="section-card detail-side care-plan-card">
+        <Card className="section-card detail-side care-plan-card">
           <SectionTitle eyebrow="疫苗 · 卓正儿保" title="儿童保健计划" />
           <CareTimeline items={carePlan} />
-        </section>
+        </Card>
       </div>
     </section>
   );

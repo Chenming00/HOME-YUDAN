@@ -1,11 +1,9 @@
-const CACHE_NAME = 'yudan-home-v2';
+const CACHE_NAME = 'yudan-home-v3';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
   '/icons/pwa-192.png',
-  '/icons/pwa-512.png',
-  '/icons/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -29,13 +27,13 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', copy));
+      caches.match('/index.html').then((cached) => {
+        const update = fetch(request).then((response) => {
+          if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', response.clone()));
           return response;
-        })
-        .catch(() => caches.match('/index.html')),
+        });
+        return cached || update;
+      }),
     );
     return;
   }

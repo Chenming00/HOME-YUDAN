@@ -7,6 +7,10 @@ import Empty from '../shared/Empty.jsx';
 import StockBar from './StockBar.jsx';
 import { chapterLeads } from '../../lib/data.js';
 import { classifyItem } from '../../lib/utils.js';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 const PANTRY_FILTERS = [
   { id: 'all', label: '全部' },
@@ -21,7 +25,7 @@ function StatusTag({ status }) {
   let tone = '';
   if (/缺货|耗尽|紧急|过期/.test(text)) tone = 'danger';
   else if (/充足|正常/.test(text)) tone = 'success';
-  return <span className={`tag ${tone}`}>{text}</span>;
+  return <Badge variant={tone === 'danger' ? 'destructive' : 'outline'} className={`tag ${tone}`}>{text}</Badge>;
 }
 
 /* 上游状态文案偶尔与数量矛盾（如 stock=0 但 status=正常），展示时以数量为准 */
@@ -77,11 +81,11 @@ export default function PantrySection({ pantry }) {
       </section>
 
       {pantry.favorites?.length > 0 && (
-        <section className="section-card">
+        <Card className="section-card">
           <SectionTitle eyebrow="常用余量" title={`常用用品 · ${pantry.favorites.length} 项`} />
           <div className="favorites-grid">
             {pantry.favorites.map((item) => (
-              <div className="favorite-card" key={item.code || item.name}>
+              <Card size="sm" className="favorite-card" key={item.code || item.name}>
                 <header>
                   <strong>{item.name}</strong>
                   <StatusTag status={displayStatus(item)} />
@@ -90,14 +94,14 @@ export default function PantrySection({ pantry }) {
                   剩 {item.stock ?? '--'} {item.unit}
                 </div>
                 <StockBar stock={item.stock} minimum={item.minimum} unit={item.unit} />
-              </div>
+              </Card>
             ))}
           </div>
-        </section>
+        </Card>
       )}
 
       {pantry.items?.length > 0 && (
-        <section className="section-card">
+        <Card className="section-card">
           <SectionTitle eyebrow="需要准备" title="补货清单" />
           <div className="inventory-table">
             <div className="inventory-head"><span>商品</span><span>库存水位</span><span>建议</span><span>状态</span></div>
@@ -116,17 +120,19 @@ export default function PantrySection({ pantry }) {
               </div>
             ))}
           </div>
-        </section>
+        </Card>
       )}
 
-      <section className="section-card pantry-all">
+      <Card className="section-card pantry-all">
         <SectionTitle eyebrow="全部用品" title={`完整库存 · ${allItems.length} 项`} />
         <div className="pantry-toolbar">
           <div className="filter-tabs" role="tablist" aria-label="库存筛选">
             {PANTRY_FILTERS.map((option, index) => (
-              <button
+              <Button
                 key={option.id}
                 id={`pantry-filter-${option.id}`}
+                variant={filter === option.id ? 'default' : 'outline'}
+                size="sm"
                 className={`filter-tab ${filter === option.id ? 'active' : ''}`}
                 onClick={() => setFilter(option.id)}
                 onKeyDown={(event) => handleFilterKeyDown(event, index)}
@@ -137,12 +143,12 @@ export default function PantrySection({ pantry }) {
               >
                 {option.label}
                 <b>{counts[option.id]}</b>
-              </button>
+              </Button>
             ))}
           </div>
           <label className="search-box">
             <Search size={14} />
-            <input
+            <Input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -175,7 +181,7 @@ export default function PantrySection({ pantry }) {
         {(filter !== 'all' || query) && (
           <p className="pantry-count-line">显示 {visibleItems.length} / {allItems.length} 项</p>
         )}
-      </section>
+      </Card>
     </section>
   );
 }

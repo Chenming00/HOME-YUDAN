@@ -5,6 +5,8 @@ import Empty from '../shared/Empty.jsx';
 import { Delta } from '../shared/Metric.jsx';
 import { chapterLeads } from '../../lib/data.js';
 import { daysBetween, formatCurrency, formatDate, formatWeight, shanghaiDateKey } from '../../lib/utils.js';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 
 function countdownPill(daysLeft) {
   if (daysLeft === 0) return { text: '就在今天', cls: 'soon' };
@@ -104,7 +106,7 @@ export default function TodaySection({ nextVaccine, nextCare, pantry, currentMon
       <Masthead babyDays={babyDays} birthday={birthday} latestWeight={latestWeight} />
 
       <div className="today-layout">
-        <section className="focus-panel" aria-label="今日焦点">
+        <Card className="focus-panel" aria-label="今日焦点">
           <div className="panel-title">
             <h3>今日焦点</h3>
             <span>{focus.length ? `共 ${focus.length} 项` : ''}</span>
@@ -121,17 +123,17 @@ export default function TodaySection({ nextVaccine, nextCare, pantry, currentMon
                       <span>{item.meta}</span>
                     </span>
                     <span className="focus-aside">
-                      {item.count && <b className="focus-count">{item.count}</b>}
-                      {item.pill && <span className={`focus-pill ${item.pill.cls}`}>{item.pill.text}</span>}
+                      {item.count && <Badge variant="destructive" className="focus-count">{item.count}</Badge>}
+                      {item.pill && <Badge variant="secondary" className={`focus-pill ${item.pill.cls}`}>{item.pill.text}</Badge>}
                     </span>
                   </button>
                 );
               })}
             </div>
           ) : <Empty text="今天没有特别需要关注的事" />}
-        </section>
+        </Card>
 
-        <aside className="snapshot" aria-label="成长速览">
+        <Card className="snapshot" aria-label="成长速览">
           <p className="snapshot-eyebrow">GROWTH SNAPSHOT · 成长速览</p>
           {latestWeight ? (
             <>
@@ -148,7 +150,7 @@ export default function TodaySection({ nextVaccine, nextCare, pantry, currentMon
               </div>
             </>
           ) : <Empty text="暂无成长记录" small />}
-        </aside>
+        </Card>
       </div>
     </section>
   );

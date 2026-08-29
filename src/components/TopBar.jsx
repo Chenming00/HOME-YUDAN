@@ -1,42 +1,56 @@
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Sparkles } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
-export default function TopBar({ chapters, active, isMobile, scrolled, onSelect, syncLabel, failed, loading, onRefresh }) {
+export default function TopBar({ chapters, active, onSelect, onPrefetch, syncLabel, failed, loading, onRefresh }) {
   return (
-    <header className={`topbar ${scrolled ? 'scrolled' : ''}`}>
-      <div className="brand">
-        <img className="brand-logo" src="/brand/yudan-logo.png" alt="鱼蛋家庭标志" />
-        <div className="brand-text">
-          <strong>鱼蛋家庭</strong>
-          <span>YUDAN HOME</span>
+    <>
+      <aside className="sidebar">
+        <div className="brand">
+          <img className="brand-logo" src="/icons/pwa-192.png" width="40" height="40" alt="" fetchPriority="high" />
+          <div className="brand-text">
+            <strong>鱼蛋家庭</strong>
+            <span>YUDAN HOME</span>
+          </div>
         </div>
-      </div>
-
-      {!isMobile && (
-        <nav className="chapter-nav" aria-label="章节导航">
+        <nav className="chapter-nav" aria-label="主要导航">
+          <span className="nav-label">生活中心</span>
           {chapters.map((chapter) => (
-            <button
+            <Button
               key={chapter.id}
+              variant="ghost"
               className={`chapter-link ${active === chapter.id ? 'active' : ''}`}
               onClick={() => onSelect(chapter.id)}
-              aria-current={active === chapter.id ? 'true' : undefined}
+              onPointerEnter={() => onPrefetch(chapter.id)}
+              onFocus={() => onPrefetch(chapter.id)}
+              aria-current={active === chapter.id ? 'page' : undefined}
             >
+              <chapter.icon />
+              <span>{chapter.label}</span>
               <span className="chapter-link-num">{chapter.number}</span>
-              {chapter.label}
-            </button>
+            </Button>
           ))}
         </nav>
-      )}
-
-      <div className="topbar-actions">
-        <div className="sync-state">
-          <span className={failed ? 'status-dot error' : 'status-dot'} />
-          <span>{syncLabel}</span>
+        <div className="sidebar-note">
+          <Sparkles size={15} />
+          <span>把家里的重要小事，放在一个地方。</span>
         </div>
-        <button className="refresh-button" onClick={onRefresh} disabled={loading} aria-label="刷新数据">
-          <RefreshCw size={16} className={loading ? 'spin' : ''} />
-          <span>刷新</span>
-        </button>
-      </div>
-    </header>
+      </aside>
+
+      <header className="topbar">
+        <div>
+          <span className="topbar-kicker">鱼蛋家庭 · 生活数据中心</span>
+          <strong>{chapters.find((chapter) => chapter.id === active)?.label}</strong>
+        </div>
+        <div className="topbar-actions">
+          <Badge variant="outline" className={failed ? 'sync-badge error' : 'sync-badge'}>
+            <span className="status-dot" />{syncLabel}
+          </Badge>
+          <Button variant="outline" size="icon-lg" onClick={onRefresh} disabled={loading} aria-label="刷新数据">
+            <RefreshCw className={loading ? 'spin' : ''} />
+          </Button>
+        </div>
+      </header>
+    </>
   );
 }
