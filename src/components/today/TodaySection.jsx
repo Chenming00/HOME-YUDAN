@@ -15,7 +15,7 @@ function countdownPill(daysLeft) {
   return { text: `已过 ${Math.abs(daysLeft)} 天`, cls: 'soon' };
 }
 
-function Masthead({ babyDays, birthday, latestWeight }) {
+function Masthead({ babyDays, birthday, latestWeight, weightChange, goTo }) {
   const today = shanghaiDateKey();
   const date = new Date(today + 'T00:00:00');
   const weekday = date.toLocaleDateString('zh-CN', { weekday: 'short' });
@@ -36,11 +36,21 @@ function Masthead({ babyDays, birthday, latestWeight }) {
       <div className="masthead-body">
         <p className="masthead-overline">YUDAN FAMILY JOURNAL</p>
         <h1 className="masthead-title">{title}</h1>
-        <p className="masthead-sub">
-          {latestWeight
-            ? `最近体重 ${formatWeight(latestWeight.weight)} kg · ${formatDate(latestWeight.date)} 记录。照看成长，也照看生活里需要被记住的小事。`
-            : '照看成长，也照看生活里需要被记住的小事。'}
-        </p>
+        {latestWeight && (
+          <button
+            type="button"
+            className="masthead-weight"
+            onClick={() => goTo('growth')}
+            aria-label="查看体重记录和趋势"
+          >
+            <span className="masthead-weight-value">{formatWeight(latestWeight.weight)}<em>kg</em></span>
+            <span className="masthead-weight-meta">
+              <span>{formatDate(latestWeight.date)} 记录</span>
+              <Delta value={weightChange} suffix=" kg" label="较上次" deltaType="weight" />
+            </span>
+          </button>
+        )}
+        <p className="masthead-sub">照看成长，也照看生活里需要被记住的小事。</p>
       </div>
     </header>
   );
@@ -103,7 +113,7 @@ export default function TodaySection({ nextVaccine, nextCare, pantry, currentMon
   return (
     <section className="chapter" id="chapter-today" data-chapter="today">
       <ChapterHeading number="01" en="TODAY" title="今天" lead={chapterLeads.today} />
-      <Masthead babyDays={babyDays} birthday={birthday} latestWeight={latestWeight} />
+      <Masthead babyDays={babyDays} birthday={birthday} latestWeight={latestWeight} weightChange={weightChange} goTo={goTo} />
 
       <div className="today-layout">
         <Card className="focus-panel" aria-label="今日焦点">

@@ -174,6 +174,14 @@
 .masthead-overline { margin: 0 0 9px; color: var(--sidebar-primary); font-size: 10px; font-weight: 650; letter-spacing: .15em; }
 .masthead-title { margin: 0; max-width: 700px; font-size: clamp(28px, 4vw, 46px); line-height: 1.08; font-weight: 590; letter-spacing: -.045em; }
 .masthead-sub { max-width: 650px; margin: 12px 0 0; color: rgba(245,250,247,.62); font-size: 13px; line-height: 1.7; }
+.masthead-weight { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 18px; margin: 8px 0 2px -12px; padding: 8px 12px; border: 0; border-radius: 12px; background: transparent; color: inherit; cursor: pointer; text-align: left; transition: background .18s ease; }
+.masthead-weight:hover { background: rgba(255,255,255,.07); }
+.masthead-weight-value { display: inline-flex; align-items: baseline; gap: 7px; font-size: clamp(34px, 5vw, 48px); line-height: 1; font-weight: 620; letter-spacing: -.05em; color: #fff; font-variant-numeric: tabular-nums; }
+.masthead-weight-value em { font-style: normal; color: rgba(245,250,247,.62); font-size: 13px; font-weight: 500; letter-spacing: 0; }
+.masthead-weight-meta { display: inline-flex; align-items: center; gap: 8px; color: rgba(245,250,247,.62); font-size: 11px; }
+.masthead .delta { color: rgba(245,250,247,.8); }
+.masthead .delta.positive { color: var(--sidebar-primary); }
+.masthead .delta.negative { color: #ffb3a6; }
 .today-layout { display: grid; grid-template-columns: minmax(0, 1.48fr) minmax(310px, .72fr); gap: 18px; }
 .focus-panel, .snapshot, .section-card, .metric-card { box-shadow: var(--shadow-soft); ring-color: transparent; border: 1px solid var(--border); }
 .focus-panel, .snapshot, .section-card { padding: 22px; }
@@ -381,6 +389,8 @@
   .masthead-title { font-size: 26px; }
   .masthead-sub { font-size: 11px; }
   .today-layout { grid-template-columns: 1fr; gap: 12px; }
+  .today-layout .snapshot { order: 1; }
+  .today-layout .focus-panel { order: 2; }
   .focus-panel, .snapshot, .section-card { padding: 17px; }
   .focus-row { grid-template-columns: 34px minmax(0, 1fr); }
   .focus-aside { grid-column: 2; }
