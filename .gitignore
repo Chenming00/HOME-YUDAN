@@ -5,3 +5,5 @@ dist/
 .env.local
 .pnpm-store/
 *.log
+
+.dev-shots/

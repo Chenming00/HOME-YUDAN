@@ -1,167 +1,66 @@
-import { CalendarDays, CircleDollarSign, HeartPulse, PackageCheck, ShoppingBag, Syringe } from 'lucide-react';
-import ChapterHeading from '../ChapterHeading.jsx';
-import WeightChart from '../charts/WeightChart.jsx';
+import { ArrowUpRight, CalendarDays, HeartPulse, Sprout, ShoppingBag, Syringe, WalletCards } from 'lucide-react';
+import WeightOverview from '../growth/WeightOverview.jsx';
 import Empty from '../shared/Empty.jsx';
-import { Delta } from '../shared/Metric.jsx';
-import { chapterLeads } from '../../lib/data.js';
-import { daysBetween, formatCurrency, formatDate, formatWeight, shanghaiDateKey } from '../../lib/utils.js';
-import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
+import { daysBetween, formatCurrency, formatDate, shanghaiDateKey } from '../../lib/utils.js';
 
-function countdownPill(daysLeft) {
-  if (daysLeft === 0) return { text: '就在今天', cls: 'soon' };
-  if (daysLeft > 0 && daysLeft <= 3) return { text: `${daysLeft} 天后`, cls: 'soon' };
-  if (daysLeft > 0) return { text: `${daysLeft} 天后`, cls: '' };
-  return { text: `已过 ${Math.abs(daysLeft)} 天`, cls: 'soon' };
+export const focusOptions = [
+  { id: 'weight', label: '体重成长', description: '把每一次变化，慢慢记下来。' },
+  { id: 'care', label: '疫苗儿保', description: '把接下来的成长安排，提前准备好。' },
+  { id: 'supplies', label: '生活准备', description: '照看日常所需，也照看家的小事。' },
+];
+
+function CarePreview({ nextVaccine, nextCare, goTo }) {
+  const items = [
+    nextVaccine && { ...nextVaccine, title: nextVaccine.name, label: '下一针疫苗', Icon: Syringe },
+    nextCare && { ...nextCare, title: nextCare.label, label: '下一次儿保', Icon: HeartPulse },
+  ].filter(Boolean);
+  return <section className="journal-panel" aria-label="接下来的安排">
+    <div className="panel-title"><h2>接下来的安排</h2><span>疫苗 · 儿保</span></div>
+    {items.length ? items.map((item) => {
+      const days = daysBetween(shanghaiDateKey(), item.date);
+      return <button type="button" className="care-preview-row" key={item.label} onClick={() => goTo('growth', 'care')}>
+        <span className="focus-icon clay"><item.Icon size={18} /></span>
+        <span className="focus-body"><span>{item.label}</span><strong>{item.title}</strong><span>{formatDate(item.date)}</span></span>
+        <span className="care-countdown">{days === 0 ? '今天' : `${days} 天后`}<ArrowUpRight size={15} /></span>
+      </button>;
+    }) : <Empty text="暂无已同步的后续安排" small />}
+  </section>;
 }
 
-function Masthead({ babyDays, birthday, latestWeight, weightChange, goTo }) {
-  const today = shanghaiDateKey();
-  const date = new Date(today + 'T00:00:00');
-  const weekday = date.toLocaleDateString('zh-CN', { weekday: 'short' });
-  const monthLabel = date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' });
-  const isKnownBirthday = Boolean(birthday);
-  const title = !isKnownBirthday
-    ? '鱼蛋的成长日记'
-    : babyDays >= 0
-      ? `来到世界的第 ${babyDays} 天`
-      : '等待与鱼蛋见面';
+function LifePreview({ pantry, currentMonth, sources, goTo }) {
+  const pantrySource = sources.find((source) => source.name === '鱼蛋宝贝消耗品');
+  const pantryKnown = Boolean(pantrySource?.ok || pantrySource?.partial || pantry.allItems?.length);
+  const restock = (pantry.outOfStock || 0) + (pantry.low || 0);
+  const expiry = (pantry.nearExpiry || 0) + (pantry.expired || 0);
+  const monthKnown = currentMonth && currentMonth.available !== false;
+  return <section className="journal-panel" aria-label="家里的小事">
+    <div className="panel-title"><h2>家里的小事</h2><span>日常 · 准备</span></div>
+    <button className="life-row" onClick={() => goTo('pantry')}><span className="focus-icon"><ShoppingBag size={18} /></span><span><strong>用品补货</strong><small>{pantryKnown ? restock ? `${pantry.outOfStock || 0} 项缺货 · ${pantry.low || 0} 项偏低` : '当前库存暂无补货提醒' : '等待库存数据同步'}</small></span><b>{pantryKnown ? restock : '—'}<small> 项</small></b><ArrowUpRight size={16} /></button>
+    {expiry > 0 && <button className="life-row" onClick={() => goTo('pantry')}><span className="focus-icon clay"><CalendarDays size={18} /></span><span><strong>留意有效期</strong><small>{pantry.nearExpiry || 0} 项临期 · {pantry.expired || 0} 项过期</small></span><b>{expiry}<small> 项</small></b><ArrowUpRight size={16} /></button>}
+    <button className="life-row" onClick={() => goTo('ledger')}><span className="focus-icon"><WalletCards size={18} /></span><span><strong>本月支出</strong><small>{monthKnown ? `${currentMonth.transactionCount || 0} 笔家庭账目` : '等待账本数据同步'}</small></span><b>{monthKnown ? formatCurrency(currentMonth.expense) : '—'}</b><ArrowUpRight size={16} /></button>
+  </section>;
+}
 
-  return (
-    <header className="masthead">
-      <div className="masthead-date">
-        <strong>{date.getDate()}</strong>
-        <span>{monthLabel} · {weekday}</span>
-      </div>
-      <div className="masthead-body">
-        <p className="masthead-overline">YUDAN FAMILY JOURNAL</p>
-        <h1 className="masthead-title">{title}</h1>
-        {latestWeight && (
-          <button
-            type="button"
-            className="masthead-weight"
-            onClick={() => goTo('growth')}
-            aria-label="查看体重记录和趋势"
-          >
-            <span className="masthead-weight-value">{formatWeight(latestWeight.weight)}<em>kg</em></span>
-            <span className="masthead-weight-meta">
-              <span>{formatDate(latestWeight.date)} 记录</span>
-              <Delta value={weightChange} suffix=" kg" label="较上次" deltaType="weight" />
-            </span>
-          </button>
-        )}
-        <p className="masthead-sub">照看成长，也照看生活里需要被记住的小事。</p>
-      </div>
+export default function TodaySection({ nextVaccine, nextCare, pantry, currentMonth, weights, babyDays, birthday, goTo, focus, onFocusChange, sources, weightAvailable }) {
+  const selected = focusOptions.find((item) => item.id === focus) || focusOptions[0];
+  const today = shanghaiDateKey();
+  const dateLabel = new Date(`${today}T12:00:00`).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
+  const panels = {
+    weight: <WeightOverview weights={weights} available={weightAvailable} onViewRecords={() => goTo('growth', 'weight')} />,
+    care: <CarePreview nextVaccine={nextVaccine} nextCare={nextCare} goTo={goTo} />,
+    supplies: <LifePreview pantry={pantry} currentMonth={currentMonth} sources={sources} goTo={goTo} />,
+  };
+  return <section className="chapter home-chapter" id="chapter-today" data-chapter="today">
+    <header className="journal-heading">
+      <div><p className="journal-eyebrow">YUDAN / 成长手记</p><h1>陪鱼蛋，一点点长大<span>。</span></h1><p className="journal-subtitle">{birthday && babyDays >= 0 ? <>出生第 <strong>{babyDays + 1}</strong> 天<span className="text-divider">/</span></> : null}<time dateTime={today}>{dateLabel}</time></p></div>
+      <div className="journal-seal" aria-hidden="true"><Sprout size={21} /><span>家的每一天<br />都值得记住</span></div>
     </header>
-  );
-}
-
-function buildFocusItems({ today, nextVaccine, nextCare, pantry, currentMonth }) {
-  const focus = [];
-  if (nextVaccine) {
-    focus.push({
-      key: 'vaccine', Icon: Syringe, tone: 'clay', target: 'growth',
-      title: `下一针疫苗 · ${nextVaccine.name}`,
-      meta: `${formatDate(nextVaccine.date)} 建议接种`,
-      pill: countdownPill(daysBetween(today, nextVaccine.date)),
-    });
-  }
-  if (nextCare) {
-    focus.push({
-      key: 'care', Icon: HeartPulse, tone: 'blue', target: 'growth',
-      title: `下一次儿保 · ${nextCare.label}`,
-      meta: `${formatDate(nextCare.date)}${nextCare.weekday ? ' · ' + nextCare.weekday : ''}`,
-      pill: countdownPill(daysBetween(today, nextCare.date)),
-    });
-  }
-  if (pantry.outOfStock > 0) {
-    focus.push({
-      key: 'out', Icon: PackageCheck, tone: 'red', target: 'pantry',
-      title: `${pantry.outOfStock} 项用品已缺货`,
-      meta: '需要优先购买',
-      count: '尽快',
-    });
-  }
-  if (pantry.low > 0) {
-    focus.push({
-      key: 'low', Icon: ShoppingBag, tone: 'ochre', target: 'pantry',
-      title: `${pantry.low} 项用品待补货`,
-      meta: '已到达安全线',
-    });
-  }
-  if ((pantry.nearExpiry || 0) + (pantry.expired || 0) > 0) {
-    focus.push({
-      key: 'expiry', Icon: CalendarDays, tone: 'ochre', target: 'pantry',
-      title: `${pantry.nearExpiry || 0} 项临期 · ${pantry.expired || 0} 项过期`,
-      meta: '尽快用完或处理',
-    });
-  }
-  if (currentMonth && currentMonth.available !== false) {
-    focus.push({
-      key: 'ledger', Icon: CircleDollarSign, tone: 'moss', target: 'ledger',
-      title: `本月已支出 ${formatCurrency(currentMonth.expense || 0)}`,
-      meta: `${currentMonth.transactionCount || 0} 笔家庭账目`,
-    });
-  }
-  return focus;
-}
-
-export default function TodaySection({ nextVaccine, nextCare, pantry, currentMonth, latestWeight, weightChange, weights, babyDays, birthday, goTo }) {
-  const today = shanghaiDateKey();
-  const focus = buildFocusItems({ today, nextVaccine, nextCare, pantry, currentMonth });
-
-  return (
-    <section className="chapter" id="chapter-today" data-chapter="today">
-      <ChapterHeading number="01" en="TODAY" title="今天" lead={chapterLeads.today} />
-      <Masthead babyDays={babyDays} birthday={birthday} latestWeight={latestWeight} weightChange={weightChange} goTo={goTo} />
-
-      <div className="today-layout">
-        <Card className="focus-panel" aria-label="今日焦点">
-          <div className="panel-title">
-            <h3>今日焦点</h3>
-            <span>{focus.length ? `共 ${focus.length} 项` : ''}</span>
-          </div>
-          {focus.length ? (
-            <div className="focus-list">
-              {focus.map((item) => {
-                const Icon = item.Icon;
-                return (
-                  <button className="focus-row" key={item.key} onClick={() => goTo(item.target)}>
-                    <span className={`focus-icon ${item.tone}`}><Icon size={18} /></span>
-                    <span className="focus-body">
-                      <strong>{item.title}</strong>
-                      <span>{item.meta}</span>
-                    </span>
-                    <span className="focus-aside">
-                      {item.count && <Badge variant="destructive" className="focus-count">{item.count}</Badge>}
-                      {item.pill && <Badge variant="secondary" className={`focus-pill ${item.pill.cls}`}>{item.pill.text}</Badge>}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : <Empty text="今天没有特别需要关注的事" />}
-        </Card>
-
-        <Card className="snapshot" aria-label="成长速览">
-          <p className="snapshot-eyebrow">GROWTH SNAPSHOT · 成长速览</p>
-          {latestWeight ? (
-            <>
-              <div className="snapshot-weight">
-                <strong>{formatWeight(latestWeight.weight)}</strong>
-                <small>kg</small>
-              </div>
-              <div className="snapshot-meta">
-                <span>{formatDate(latestWeight.date)} 记录</span>
-                <Delta value={weightChange} suffix=" kg" label="较上次" deltaType="weight" />
-              </div>
-              <div className="snapshot-chart">
-                <WeightChart weights={weights} spark />
-              </div>
-            </>
-          ) : <Empty text="暂无成长记录" small />}
-        </Card>
-      </div>
-    </section>
-  );
+    <div className="focus-toolbar">
+      <div><span className="focus-dot" /><strong>当前关注</strong><span className="focus-description">{selected.description}</span></div>
+      <label className="focus-select"><span className="sr-only">切换当前关注</span><select value={selected.id} onChange={(event) => onFocusChange(event.target.value)}>{focusOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>
+    </div>
+    <div className="home-primary" key={selected.id}>{panels[selected.id]}</div>
+    <div className={`home-secondary ${selected.id !== 'weight' ? 'has-weight' : ''}`}>{focusOptions.filter((option) => option.id !== selected.id).map((option) => <div key={option.id}>{panels[option.id]}</div>)}</div>
+    <p className="journal-footnote">不同阶段，有不同的牵挂。当前关注可随时切换，选择会保存在这台设备。</p>
+  </section>;
 }

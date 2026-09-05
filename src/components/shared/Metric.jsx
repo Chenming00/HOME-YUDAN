@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils.js';
 import { Card } from '@/components/ui/card';
 
@@ -9,7 +9,7 @@ export function Delta({ value, suffix = '', label, currency, deltaType }) {
 
   let tone = positive ? 'up' : 'down';
   if (deltaType === 'weight') {
-    tone = positive ? 'positive' : 'negative';
+    tone = 'weight';
   } else if (deltaType === 'expense') {
     tone = positive ? 'negative' : 'positive';
   }
@@ -19,8 +19,8 @@ export function Delta({ value, suffix = '', label, currency, deltaType }) {
     : Math.abs(num).toFixed(3).replace(/0+$/, '').replace(/\.$/, '') + suffix;
 
   return (
-    <span className={`delta ${tone}`}>
-      {positive ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+    <span className={`delta ${tone}`} aria-label={`${label || '变化'}：${num === 0 ? '持平' : positive ? '增加' : '减少'} ${absValue}`}>
+      {num === 0 ? <Minus size={13} /> : positive ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
       {absValue}
       {label && <em>{label}</em>}
     </span>

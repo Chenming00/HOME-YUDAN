@@ -1,24 +1,8 @@
-import { Badge } from '@/components/ui/badge';
-
 export default function SourceStatus({ sources }) {
   if (!sources.length) return null;
-  const allOnline = sources.every((source) => source.ok);
-  if (allOnline) {
-    return (
-      <div className="source-strip source-summary">
-        <Badge variant="outline" className="online"><i />{sources.length} 个数据源正常</Badge>
-      </div>
-    );
-  }
-  return (
-    <div className="source-strip">
-      {sources.map((source) => (
-        <Badge variant="outline" key={source.name} className={source.ok ? 'online' : source.partial ? 'partial' : 'offline'}>
-          <i />
-          {source.name}
-          <b>{source.ok ? '已连接' : source.partial ? '部分可用' : '待配置'}</b>
-        </Badge>
-      ))}
-    </div>
-  );
+  const online = sources.filter((source) => source.ok).length;
+  return <details className="source-health">
+    <summary><span className={online === sources.length ? 'health-dot online' : 'health-dot'} />数据连接 · {online}/{sources.length}<span>查看详情</span></summary>
+    <div className="source-strip">{sources.map((source) => <span key={source.name} className={source.ok ? 'online' : ''}><i />{source.name}<b>{source.ok ? '已连接' : source.partial ? '部分可用' : source.requiresKey ? '待配置' : '暂未连接'}</b></span>)}</div>
+  </details>;
 }

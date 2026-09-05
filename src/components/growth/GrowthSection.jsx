@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import ChapterHeading from '../ChapterHeading.jsx';
-import WeightChart from '../charts/WeightChart.jsx';
+import WeightOverview from './WeightOverview.jsx';
 import SectionTitle from '../shared/SectionTitle.jsx';
 import Empty from '../shared/Empty.jsx';
 import { Delta } from '../shared/Metric.jsx';
@@ -52,7 +52,7 @@ function CareTimeline({ items }) {
   const visibleItems = collapsedItems.length
     ? filtered.filter((item) => !collapsedItems.includes(item))
     : filtered;
-  const hiddenCount = collapsedItems.length;
+  const hiddenCount = collapseActive ? filtered.slice(0, collapseStart).filter((item) => item.completed).length : 0;
 
   const handleFilterKeyDown = (event, index) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -124,86 +124,30 @@ function CareTimeline({ items }) {
   );
 }
 
-const GROWTH_TABS = [
-  { id: 'weight', label: '体重' },
-  { id: 'care', label: '保健' },
-];
-
-export default function GrowthSection({ weights, carePlan, latestWeight, weightChange }) {
-  const isMobile = useMediaQuery('(max-width: 767px)');
-  const [activeTab, setActiveTab] = useState('weight');
-
-  const weightCard = (
-    <Card className="section-card detail-main">
-      <SectionTitle eyebrow="成长趋势" title="体重记录" />
-      <div className="detail-summary">
-        <div>
-          <span>最新体重</span>
-          <strong>{latestWeight ? formatWeight(latestWeight.weight) : '--'} <small>kg</small></strong>
-        </div>
-        <Delta value={weightChange} suffix=" kg" label="较上次" deltaType="weight" />
-      </div>
-      <WeightChart weights={weights} large />
-      <div className="record-table">
-        <div className="table-head"><span>日期</span><span>体重</span><span>较上次</span></div>
-        {weights.map((item, index) => {
-          const older = weights[index + 1];
-          return (
-            <div className="table-row" key={item.date}>
-              <span>{formatDate(item.date)}</span>
-              <strong>{formatWeight(item.weight)} kg</strong>
-              <Delta value={older ? item.weight - older.weight : null} suffix=" kg" deltaType="weight" />
-            </div>
-          );
-        })}
-      </div>
-      {!weights.length && <Empty text="暂无体重记录" />}
-    </Card>
-  );
-
-  const careCard = (
-    <Card className="section-card detail-side care-plan-card">
-      <SectionTitle eyebrow="疫苗 · 卓正儿保" title="儿童保健计划" />
-      <CareTimeline items={carePlan} />
-    </Card>
-  );
-
+export default function GrowthSection({ weights, carePlan, activeTab, onTabChange, weightAvailable }) {
+  const [visibleCount, setVisibleCount] = useState(20);
   return (
     <section className="chapter" id="chapter-growth" data-chapter="growth">
       <ChapterHeading number="02" en="GROWTH & CARE" title="成长健康" lead={chapterLeads.growth} />
-
-      {isMobile && (
-        <div className="growth-tabs" role="tablist" aria-label="成长健康切换">
-          {GROWTH_TABS.map((tab) => (
-            <Button
-              key={tab.id}
-              variant={activeTab === tab.id ? 'default' : 'outline'}
-              size="sm"
-              className={`chip ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-              role="tab"
-              aria-selected={activeTab === tab.id}
-              aria-controls={`growth-panel-${tab.id}`}
-            >
-              {tab.label}
-            </Button>
-          ))}
+      <div className="growth-tabs" role="group" aria-label="成长健康切换">
+        {[{ id: 'weight', label: '体重记录' }, { id: 'care', label: '疫苗儿保' }].map((tab) => <Button key={tab.id} variant={activeTab === tab.id ? 'default' : 'outline'} aria-pressed={activeTab === tab.id} onClick={() => onTabChange(tab.id)}>{tab.label}</Button>)}
+      </div>
+      <div className="growth-layout" data-active={activeTab}>
+        <div className="growth-weight">
+          <WeightOverview weights={weights} available={weightAvailable} />
+          <Card className="section-card weight-history">
+            <SectionTitle eyebrow="一点一滴" title={'体重记录 · ' + weights.length + ' 次'} />
+            <div className="record-table">
+              <div className="table-head"><span>记录日期</span><span>体重</span><span>较上次</span></div>
+              {weights.slice(0, visibleCount).map((item, index) => <div className="table-row" key={item.date + '-' + index}>
+                <time dateTime={item.date}>{item.date}</time><strong>{formatWeight(item.weight)} kg</strong><Delta value={weights[index + 1] ? item.weight - weights[index + 1].weight : null} suffix=" kg" deltaType="weight" />
+              </div>)}
+            </div>
+            {!weights.length && <Empty text="暂无体重记录" />}
+            {weights.length > visibleCount && <Button variant="outline" className="history-more" onClick={() => setVisibleCount((count) => count + 20)}>查看更多记录（还有 {weights.length - visibleCount} 次）</Button>}
+          </Card>
         </div>
-      )}
-
-      <div className="detail-layout">
-        {isMobile ? (
-          activeTab === 'weight' ? (
-            <div id="growth-panel-weight" role="tabpanel">{weightCard}</div>
-          ) : (
-            <div id="growth-panel-care" role="tabpanel">{careCard}</div>
-          )
-        ) : (
-          <>
-            {weightCard}
-            {careCard}
-          </>
-        )}
+        <Card className="section-card growth-care"><SectionTitle eyebrow="疫苗 · 卓正儿保" title="儿童保健计划" /><CareTimeline items={carePlan} /></Card>
       </div>
     </section>
   );

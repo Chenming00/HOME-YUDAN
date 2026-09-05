@@ -4,7 +4,6 @@ import ChapterHeading from '../ChapterHeading.jsx';
 import Metric from '../shared/Metric.jsx';
 import SectionTitle from '../shared/SectionTitle.jsx';
 import Empty from '../shared/Empty.jsx';
-import StockBar from './StockBar.jsx';
 import { chapterLeads } from '../../lib/data.js';
 import { classifyItem } from '../../lib/utils.js';
 import { Badge } from '@/components/ui/badge';
@@ -76,7 +75,7 @@ export default function PantrySection({ pantry }) {
       <section className="metric-grid" aria-label="库存关键数据">
         <Metric icon={PackageCheck} tone="teal" label="启用商品" value={String(pantry.total || 0)} unit="种" detail="用品总数" />
         <Metric icon={AlertCircle} tone="red" label="已缺货" value={String(pantry.outOfStock || 0)} unit="项" detail="需要优先购买" />
-        <Metric icon={ShoppingBag} tone="amber" label="待补货" value={String(pantry.low || 0)} unit="项" detail="达到安全线" />
+        <Metric icon={ShoppingBag} tone="amber" label="待补货" value={String(pantry.low || 0)} unit="项" detail="留意剩余数量" />
         <Metric icon={CalendarDays} tone="blue" label="临期与过期" value={String((pantry.nearExpiry || 0) + (pantry.expired || 0))} unit="项" detail={`${pantry.nearExpiry || 0} 项临期 · ${pantry.expired || 0} 项过期`} />
       </section>
 
@@ -93,7 +92,6 @@ export default function PantrySection({ pantry }) {
                 <div className="favorite-stock">
                   剩 {item.stock ?? '--'} {item.unit}
                 </div>
-                <StockBar stock={item.stock} minimum={item.minimum} unit={item.unit} />
               </Card>
             ))}
           </div>
@@ -104,7 +102,7 @@ export default function PantrySection({ pantry }) {
         <Card className="section-card">
           <SectionTitle eyebrow="需要准备" title="补货清单" />
           <div className="inventory-table">
-            <div className="inventory-head"><span>商品</span><span>库存水位</span><span>建议</span><span>状态</span></div>
+            <div className="inventory-head"><span>商品</span><span>当前库存</span><span>状态</span></div>
             {pantry.items.map((item) => (
               <div className="inventory-row" key={item.code || item.name}>
                 <div>
@@ -114,8 +112,7 @@ export default function PantrySection({ pantry }) {
                     {item.note && <small>{item.note}</small>}
                   </span>
                 </div>
-                <StockBar stock={item.stock} minimum={item.minimum} unit={item.unit} />
-                <b>{item.suggested > 0 ? `补 ${item.suggested} ${item.unit}` : `剩 ${item.stock ?? '--'} ${item.unit}`}</b>
+                <b>{item.stock ?? '--'} {item.unit}</b>
                 <StatusTag status={displayStatus(item)} />
               </div>
             ))}
@@ -158,7 +155,7 @@ export default function PantrySection({ pantry }) {
           </label>
         </div>
         <div id="pantry-inventory-panel" role="tabpanel" aria-labelledby={`pantry-filter-${filter}`} className="inventory-table">
-          <div className="inventory-head"><span>商品</span><span>库存水位</span><span>当前库存</span><span>状态</span></div>
+          <div className="inventory-head"><span>商品</span><span>当前库存</span><span>状态</span></div>
           {visibleItems.length ? (
             visibleItems.map((item) => (
               <div className="inventory-row" key={item.code || item.name}>
@@ -169,7 +166,6 @@ export default function PantrySection({ pantry }) {
                     <small>{item.category || '未分类'}</small>
                   </span>
                 </div>
-                <StockBar stock={item.stock} minimum={item.minimum} unit={item.unit} />
                 <b>{item.stock ?? '--'} {item.unit}</b>
                 <StatusTag status={displayStatus(item)} />
               </div>
