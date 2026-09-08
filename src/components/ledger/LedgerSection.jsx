@@ -34,8 +34,8 @@ export default function LedgerSection({ months, transactions, currentMonth, expe
           </Card>
         </div>
         <Card className="section-card detail-side">
-          <SectionTitle eyebrow="消费明细" title="最近账目" />
-          <TransactionList items={transactions} />
+          <SectionTitle eyebrow="按购买时间 · 最新在前" title="最近 30 笔账目" />
+          <TransactionList items={transactions} limit={30} />
         </Card>
       </div>
     </section>

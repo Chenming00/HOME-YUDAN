@@ -153,7 +153,7 @@ pnpm preview  # 本地预览构建产物
 | 上游服务 | 接口 | 用途 |
 | --- | --- | --- |
 | 鱼蛋小账本 | `/api/monthly?year=&month=`（近 6 个月并发） | 月度收支、分类占比 |
-| 鱼蛋小账本 | `/api/list?limit=8` | 最近交易明细 |
+| 鱼蛋小账本 | `/api/list?limit=100&cursor=…` | 分页读取后按购买时间降序选取最近 30 笔；缺失购买时间的记录排最后 |
 | 鱼蛋小账本 | `/api/yudan`（需 Key） | 体重记录 |
 | 鱼蛋小账本 | `/api/yudan/vaccines`（需 Key） | 疫苗计划 |
 | 鱼蛋小账本 | `/api/yudan/care`（需 Key） | 儿保里程碑/生日 |

@@ -1,15 +1,19 @@
 const LOG_BASE = process.env.YUDAN_LOG_BASE_URL || 'https://cost.ykn.cm';
 const PANTRY_BASE = process.env.YUDAN_PANTRY_BASE_URL || 'https://wupin.ykn.cm';
 
-async function read(base, path, key) {
+async function read(base, path, key, signal) {
   try {
     const response = await fetch(`${base}${path}`, {
       headers: { Accept: 'application/json', ...(key ? { Authorization: `Bearer ${key}` } : {}) },
-      signal: AbortSignal.timeout(8000),
+      signal: signal || AbortSignal.timeout(8000),
     });
     if (!response.ok) return { ok: false, data: null };
     const json = await response.json();
-    return { ok: true, data: json?.data ?? json };
+    return {
+      ok: true, data: json?.data ?? json,
+      hasMore: json?.hasMore ?? json?.data?.hasMore,
+      nextCursor: json?.nextCursor ?? json?.data?.nextCursor,
+    };
   } catch {
     return { ok: false, data: null };
   }
@@ -51,7 +55,33 @@ async function readMonthlySeries() {
   };
 }
 
-const transactionsOf = (value) => arrayOf(value, ['items', 'transactions', 'records']).map((item) => ({
+// The upstream list is ordered by entry time, so read every page before selecting purchases.
+async function readRecentTransactions() {
+  const signal = AbortSignal.timeout(8000);
+  const items = [];
+  const cursors = new Set();
+  let cursor = '';
+  while (true) {
+    const page = await read(LOG_BASE, '/api/list?limit=100' + (cursor ? '&cursor=' + encodeURIComponent(cursor) : ''), undefined, signal);
+    if (!page.ok) return { ok: false, data: null };
+    items.push(...arrayOf(page.data, ['items', 'transactions', 'records']));
+    if (!page.hasMore) return { ok: true, data: items };
+    if (!page.nextCursor || cursors.has(page.nextCursor)) return { ok: false, data: null };
+    cursor = page.nextCursor;
+    cursors.add(cursor);
+  }
+}
+
+function purchaseTimestamp(item) {
+  const timestamp = Date.parse(item.transaction_time || item.transaction_date || item.date || '');
+  return Number.isFinite(timestamp) ? timestamp : -Infinity;
+}
+
+const transactionsOf = (value) => arrayOf(value, ['items', 'transactions', 'records'])
+  .slice()
+  .sort((a, b) => purchaseTimestamp(b) - purchaseTimestamp(a))
+  .slice(0, 30)
+  .map((item) => ({
   id: item.id,
   brand: item.brand || '',
   product: item.product || '',
@@ -150,7 +180,7 @@ export default async function handler(request, response) {
   const pantryKey = process.env.YUDAN_PANTRY_API_KEY;
   const [monthly, list, growth, vaccines, care, dashboard, products, attention] = await Promise.all([
     readMonthlySeries(),
-    read(LOG_BASE, '/api/list?limit=8'),
+    readRecentTransactions(),
     read(LOG_BASE, '/api/yudan', logKey),
     read(LOG_BASE, '/api/yudan/vaccines', logKey),
     read(LOG_BASE, '/api/yudan/care', logKey),

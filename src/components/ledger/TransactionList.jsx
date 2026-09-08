@@ -1,6 +1,6 @@
 import { ChevronDown, WalletCards } from 'lucide-react';
 import Empty from '../shared/Empty.jsx';
-import { formatCurrency, formatDate } from '../../lib/utils.js';
+import { formatCurrency } from '../../lib/utils.js';
 
 function fullTime(value) {
   if (!value) return '未记录';
@@ -30,7 +30,7 @@ export default function TransactionList({ items, limit }) {
               <span className="transaction-overview">
                 <strong>{title}</strong>
                 <span className="transaction-meta">
-                  <span>{formatDate(time)}</span>
+                  <span>{time && Number.isFinite(Date.parse(time)) ? new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', month: 'long', day: 'numeric' }).format(new Date(time)) : '未记录时间'}</span>
                   <span>{item.category || '未分类'}</span>
                 </span>
               </span>
