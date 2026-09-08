@@ -52,8 +52,14 @@ async function readMonthlySeries() {
 }
 
 const transactionsOf = (value) => arrayOf(value, ['items', 'transactions', 'records']).map((item) => ({
-  date: item.date || item.transaction_date || item.transaction_time || item.created_at,
-  title: item.title || item.description || item.note || '家庭支出',
+  id: item.id,
+  brand: item.brand || '',
+  product: item.product || '',
+  type: item.type || 'expense',
+  transaction_time: item.transaction_time || item.date || item.transaction_date || item.created_at,
+  note: item.note || '',
+  date: item.transaction_time || item.date || item.transaction_date || item.created_at,
+  title: [item.brand?.trim(), item.product?.trim()].filter(Boolean).join(' ') || item.title || item.description || item.note || '家庭支出',
   category: item.category || item.category_name || '未分类',
   amount: Number(item.amount || 0),
 }));
