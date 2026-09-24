@@ -99,9 +99,13 @@ function CareTimeline({ items }) {
                   <div className="timeline-meta">
                     <span>{formatDate(item.date)}{item.weekday ? ' · ' + item.weekday : ''}</span>
                     <b className={'source-tag ' + item.recordType}>{item.source || (item.recordType === 'vaccine' ? '疫苗' : '卓正儿保')}</b>
+                    {item.recordType === 'vaccine' && item.funding && <b className={`source-tag funding ${item.funding}`}>{item.funding === 'free' ? '免费' : '自费'}</b>}
+                    {item.ageLabel && <em>{item.ageLabel}</em>}
                     {item.status && <em>{item.status}</em>}
                   </div>
                   <strong>{item.name || item.label}</strong>
+                  {item.prevents && <small className="timeline-sub">预防：{item.prevents}</small>}
+                  {item.note && <small className="timeline-note">{item.note}</small>}
                 </div>
               </div>
             );

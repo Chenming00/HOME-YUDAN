@@ -1,6 +1,7 @@
 import { HeartPulse, PackageCheck, Sparkles, WalletCards } from 'lucide-react';
 
-export const BABY_BIRTHDAY_FALLBACK = '2026-08-30';
+// 与上游 /api/yudan、/api/yudan/care 一致的真实生日（2026-08-30 为预产期，勿用作 fallback）
+export const BABY_BIRTHDAY_FALLBACK = '2026-08-12';
 
 export const emptyData = {
   meta: { mode: 'loading', updatedAt: null, sources: [] },
@@ -8,7 +9,7 @@ export const emptyData = {
   growth: { weights: [] },
   vaccines: [],
   care: { provider: '', birthday: '', milestones: [] },
-  pantry: { total: 0, low: 0, outOfStock: 0, nearExpiry: 0, expired: 0, items: [], favorites: [], allItems: [] },
+  pantry: { total: 0, low: 0, outOfStock: 0, nearExpiry: 0, expired: 0, unknownExpiry: 0, unplannedPurchase: 0, items: [], favorites: [], allItems: [] },
 };
 
 export const chapters = [

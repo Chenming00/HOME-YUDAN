@@ -50,6 +50,11 @@ async function readMonthlySeries() {
       expense: result.ok ? Number(result.data?.totalExpense || 0) : null,
       transactionCount: result.ok ? Number(result.data?.transactionCount || 0) : null,
       categoryBreakdown: result.ok ? arrayOf(result.data?.categoryBreakdown) : [],
+      dailyExpenses: result.ok
+        ? arrayOf(result.data?.dailyExpenses).map((day) => ({ date: day.date, amount: Number(day.amount || 0) }))
+        : [],
+      prevMonthExpense: result.ok && result.data?.prevMonthExpense != null ? Number(result.data.prevMonthExpense) : null,
+      allTimeExpense: result.ok && result.data?.allTimeExpense != null ? Number(result.data.allTimeExpense) : null,
       available: result.ok,
     })),
   };
@@ -107,6 +112,9 @@ const vaccinesOf = (value) => arrayOf(value, ['vaccines', 'vaccine_records', 'sc
     date: item.suggested_date || item.suggestedDate || item.date,
     actualDate,
     ageLabel: item.age_label || item.ageLabel || '',
+    funding: item.funding || '',
+    prevents: item.prevents || '',
+    note: item.schedule_note || item.scheduleNote || '',
     status: actualDate ? '已完成' : item.status || '计划中',
   };
 }).filter((item) => item.date);
@@ -146,6 +154,8 @@ function pantryOf(value, products, attention) {
       name: item.name || item.product_name || item.product?.name,
       category: item.category || item.product?.category || '未分类',
       note: item.note || '',
+      spec: item.spec || item.product?.spec || '',
+      location: Array.isArray(item.locations) ? item.locations[0] || '' : item.location || '',
       stock,
       minimum,
       suggested: Number(item.suggest ?? item.suggested_quantity ?? (stock === null ? 0 : Math.max(0, minimum - stock))),
@@ -164,6 +174,8 @@ function pantryOf(value, products, attention) {
     outOfStock: Number(stats.outOfStockCount ?? stats.out_of_stock ?? stats.out_of_stock_count ?? 0),
     nearExpiry: Number(stats.nearExpiryCount ?? stats.near_expiry ?? stats.near_expiry_count ?? alerts.length ?? 0),
     expired: Number(stats.expiredCount ?? stats.expired_count ?? 0),
+    unknownExpiry: Number(stats.unknownExpiryCount ?? stats.unknown_expiry ?? stats.unknown_expiry_count ?? 0),
+    unplannedPurchase: Number(stats.unplannedPurchaseCount ?? stats.unplanned_purchase ?? 0),
     items,
     favorites: favoriteItems,
     allItems,

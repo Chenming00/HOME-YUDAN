@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
@@ -21,6 +21,11 @@ export default defineConfig({
     {
       name: 'dev-api-home',
       configureServer(server) {
+        // Vite 只把 VITE_ 前缀变量写进 import.meta.env；服务端 handler 需要显式从 .env 合并 YUDAN_* 变量
+        const env = loadEnv(server.config.mode, server.config.envDir || process.cwd(), '');
+        for (const [key, value] of Object.entries(env)) {
+          if (key.startsWith('YUDAN_') && process.env[key] === undefined) process.env[key] = value;
+        }
         server.middlewares.use('/api/home', async (request, response) => {
           try {
             await homeHandler(request, response);

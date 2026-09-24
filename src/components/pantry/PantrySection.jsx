@@ -76,7 +76,7 @@ export default function PantrySection({ pantry }) {
         <Metric icon={PackageCheck} tone="teal" label="启用商品" value={String(pantry.total || 0)} unit="种" detail="用品总数" />
         <Metric icon={AlertCircle} tone="red" label="已缺货" value={String(pantry.outOfStock || 0)} unit="项" detail="需要优先购买" />
         <Metric icon={ShoppingBag} tone="amber" label="待补货" value={String(pantry.low || 0)} unit="项" detail="留意剩余数量" />
-        <Metric icon={CalendarDays} tone="blue" label="临期与过期" value={String((pantry.nearExpiry || 0) + (pantry.expired || 0))} unit="项" detail={`${pantry.nearExpiry || 0} 项临期 · ${pantry.expired || 0} 项过期`} />
+        <Metric icon={CalendarDays} tone="blue" label="临期与过期" value={String((pantry.nearExpiry || 0) + (pantry.expired || 0))} unit="项" detail={`${pantry.nearExpiry || 0} 项临期 · ${pantry.expired || 0} 项过期${pantry.unknownExpiry ? ` · ${pantry.unknownExpiry} 项效期未知` : ''}`} />
       </section>
 
       {pantry.favorites?.length > 0 && (
@@ -109,7 +109,7 @@ export default function PantrySection({ pantry }) {
                   <span className="item-icon"><PackageCheck size={16} /></span>
                   <span className="inventory-name">
                     <strong>{item.name}</strong>
-                    {item.note && <small>{item.note}</small>}
+                    {[item.spec, item.location, item.note].filter(Boolean).length > 0 && <small>{[item.spec, item.location, item.note].filter(Boolean).join(' · ')}</small>}
                   </span>
                 </div>
                 <b>{item.stock ?? '--'} {item.unit}</b>
@@ -163,7 +163,7 @@ export default function PantrySection({ pantry }) {
                   <span className="item-icon"><PackageCheck size={16} /></span>
                   <span className="inventory-name">
                     <strong>{item.name}</strong>
-                    <small>{item.category || '未分类'}</small>
+                    <small>{[item.category || '未分类', item.spec, item.location].filter(Boolean).join(' · ')}</small>
                   </span>
                 </div>
                 <b>{item.stock ?? '--'} {item.unit}</b>
